@@ -1,4 +1,4 @@
 DynamicLDA
 ==========
 
-Dynamic Model of Reuters News Articles
+Dynamic Topic Model of Reuters News Articles since 2007
