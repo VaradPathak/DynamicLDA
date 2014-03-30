@@ -3,8 +3,31 @@ import requests
 import article as ac
 
 
-urls = list()
-articles = list()
+
+def getText(docId, URL):
+    page = requests.get(URL)
+    tree = html.fromstring(page.text)
+# This will create a list of article URLs:
+    URLs = tree.xpath('//div[@class="headlineMed"]/a/@href')
+#     Title = tree.xpath('//div[@class="headlineMed"]/a/text()')
+    date = URL[-13:-5]
+    for num in range(0, len(URLs)):
+        docId = docId + 1
+        doc = ac.article('', date, '', URLs[num], docId)
+        curpage = requests.get(doc.URL)
+        curtree = html.fromstring(curpage.text)
+        Title = curtree.xpath('//*[@id="content"]/div[4]/div/div[3]/div[1]/h1/text()')
+        Paragraphs = curtree.xpath('//*[@id="articleText"]/p/text()')
+        # Location = tree.xpath('//*[@id="articleInfo"]/p[2]/span[1]/text()')
+        if len(Title) > 0:
+            doc.Title = Title[0]
+            Paragraphs.append(Title[0])
+        doc.Text = " ".join(Paragraphs)
+    
+    return doc
+
+docId = 0  
+f = open('2014.txt', 'w')
 for yr in range(2014, 2015):
     year = 'http://www.reuters.com/resources/archive/us/' + str(yr)
     for mnth in range(1, 2):
@@ -12,46 +35,16 @@ for yr in range(2014, 2015):
             month = '0' + str(mnth)
         else:
             month = str(mnth)
+        
         for day in range(1, 2):
             if(day < 10):
                 URL = year + month + '0' + str(day) + '.html'
             else:
                 URL = year + month + str(day) + '.html'
-            urls.append(URL)
-    
-docId = 0        
+            
+            doc = getText(docId, URL)
+            print str(doc.id) + " " + doc.Title + "\n" + doc.Text + "\n"
+            f.write(str(doc.id) + " " + doc.Title + "\n" + doc.Text + "\n")
 
-f = open('2014.txt', 'w')
-
-for URL in urls:
-    page = requests.get(URL)
-    tree = html.fromstring(page.text)
-    
-    # This will create a list of article URLs:
-    URLs = tree.xpath('//div[@class="headlineMed"]/a/@href')
-    Title = tree.xpath('//div[@class="headlineMed"]/a/text()')
-    date = URL[-13:-5]
-    
-    for num in range (0, len(URLs)):
-        docId = docId + 1 
-        doc = ac.article(Title[num], date, '', URLs[num], docId)
-        articles.append(doc)
-
-for doc in articles:
-    #print doc.id, doc.Date, doc.URL, doc.Title
-    curpage = requests.get(doc.URL)
-    curtree = html.fromstring(curpage.text)
-    Title = curtree.xpath('//*[@id="content"]/div[4]/div/div[3]/div[1]/h1/text()')
-    Paragraphs = curtree.xpath('//*[@id="articleText"]/p/text()')
-    #Location = tree.xpath('//*[@id="articleInfo"]/p[2]/span[1]/text()')
-    #print doc.URL
-
-    if len(Title) > 0:
-        doc.Title = Title[0]
-        Paragraphs.append(Title[0])
-    doc.Text = " ".join(Paragraphs)    
-    #print doc.Text
-    f.write(str(doc.id) + " " +  doc.Title + "\n" + doc.Text + "\n")
-    
 f.close()
     
