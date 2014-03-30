@@ -1,0 +1,8 @@
+# Compiled source #
+###################
+*.o
+*.pyc
+#Data
+*.txt
+#eclipse files
+.settings/
