@@ -34,10 +34,12 @@ for yr in range(2013, 2014):
                 Paragraphs = curtree.xpath('//*[@id="articleText"]/p/text()')
                 # Location = tree.xpath('//*[@id="articleInfo"]/p[2]/span[1]/text()')
                 if len(Title) > 0:
-                    doc.Title = Title[0]
+                    doc.Title = Title[0].replace('\"', '')
                     Paragraphs.append(Title[0])
                 doc.Text = " ".join(Paragraphs)
-                f.write(str(doc.id) + " " + doc.Title + "\n" + doc.Text + "\n")
+                doc.Text = doc.Text.replace('\n', ' ')
+                doc.Text = doc.Text.replace('\"', '')
+                f.write(str(doc.id) + "," + str(doc.Date) + ',\"' + doc.Title.encode('utf-8') + '\",\"' + doc.Text.encode('utf-8') + '\"\n')
 
 f.close()
     
