@@ -4,7 +4,8 @@ import article as ac
 
 
 docId = 0  
-f = open('2014.txt', 'w')
+#f = open('2014.txt', 'w')
+seqfile = open('seqfile.txt', 'w')
 for yr in range(2013, 2014):
     year = 'http://www.reuters.com/resources/archive/us/' + str(yr)
     for mnth in range(1, 2):
@@ -13,7 +14,7 @@ for yr in range(2013, 2014):
         else:
             month = str(mnth)
         
-        for day in range(1, 2):
+        for day in range(1, 32):
             if(day < 10):
                 URL = year + month + '0' + str(day) + '.html'
             else:
@@ -25,7 +26,9 @@ for yr in range(2013, 2014):
             URLs = tree.xpath('//div[@class="headlineMed"]/a/@href')
         #     Title = tree.xpath('//div[@class="headlineMed"]/a/text()')
             date = URL[-13:-5]
-            for num in range(0, len(URLs)):
+            #seqfile.write(str(len(URLs)))
+            daydocs = 0
+            for num in range(0, 5): #len(URLs)
                 docId = docId + 1
                 doc = ac.article('', date, '', URLs[num], docId)
                 curpage = requests.get(doc.URL)
@@ -39,7 +42,15 @@ for yr in range(2013, 2014):
                 doc.Text = " ".join(Paragraphs)
                 doc.Text = doc.Text.replace('\n', ' ')
                 doc.Text = doc.Text.replace('\"', '')
-                f.write(str(doc.id) + "," + str(doc.Date) + ',\"' + doc.Title.encode('utf-8') + '\",\"' + doc.Text.encode('utf-8') + '\"\n')
 
-f.close()
+                if(doc.Text and not doc.Title==doc.Text):
+                    print doc.id
+                    daydocs = daydocs + 1
+                    f = open(str(doc.Date)+'_'+str(doc.id)+'.txt', 'w')
+                    #f.write(str(doc.id) + "," + str(doc.Date) + ',\"' + doc.Title.encode('utf-8') + '\",\"' + doc.Text.encode('utf-8') + '\"\n')
+                    f.write(doc.Title.encode('utf-8') + ', ' + doc.Text.encode('utf-8') + '\n')
+                    f.close()
+            seqfile.write(str(daydocs)+'\n')
+seqfile.close()
+#f.close()
     
