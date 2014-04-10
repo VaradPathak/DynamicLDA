@@ -5,7 +5,7 @@ import sys
 import random
 import nltk
 import re
-from stemming.porter2 import stem
+from porter2 import stem
 
 
 docId = 0  
@@ -17,7 +17,6 @@ if len(sys.argv) >= 4:
 
 else:
     print 'usage: python __init__.py year firstmonth num_months'
-    sys.exit(0)
 
 for yr in range(theyear, theyear + 1):
     year = 'http://www.reuters.com/resources/archive/us/' + str(yr)
@@ -38,6 +37,7 @@ for yr in range(theyear, theyear + 1):
             tree = html.fromstring(page.text)
             URLs = tree.xpath('//div[@class="headlineMed"]/a/@href')
             date = URL[-13:-5]
+
             f = open('output/' + str(date) + '.txt', 'w')
             # generate the random vector(python generate a sample without 
             # replacement from a range of numbers)
@@ -63,16 +63,11 @@ for yr in range(theyear, theyear + 1):
                     
                     docText = re.sub('[^A-Za-z]+', ' ', doc.Text)
                     docTitle = re.sub('[^A-Za-z]+', ' ', doc.Title)
-                    docText = docTitle + ', ' + docText  
+                    docText = docTitle + ' ' + docText  
                     docText = docText.lower()
                     tokens = docText.split()
 
                     docText = " ".join([stem(t) for t in tokens])
-
-                    rawTitle = re.sub('[^A-Za-z]+', ' ', doc.Title)
-                    rawTitle = rawTitle.lower()
-                    tokens = rawTitle.split()
-                    rawTitle = " ".join([stem(t) for t in tokens])
 
                     f.write(docText.encode('utf-8') + '\n')
 
