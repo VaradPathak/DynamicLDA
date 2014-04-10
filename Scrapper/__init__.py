@@ -1,6 +1,8 @@
 from lxml import html
 import requests
 import article as ac
+import nltk
+import re
 
 
 docId = 0  
@@ -8,7 +10,7 @@ docId = 0
 seqfile = open('seqfile.txt', 'w')
 for yr in range(2013, 2014):
     year = 'http://www.reuters.com/resources/archive/us/' + str(yr)
-    for mnth in range(1, 2):
+    for mnth in range(3, 13):
         if(mnth < 10):
             month = '0' + str(mnth)
         else:
@@ -28,7 +30,7 @@ for yr in range(2013, 2014):
             date = URL[-13:-5]
             #seqfile.write(str(len(URLs)))
             daydocs = 0
-            for num in range(0, 5): #len(URLs)
+            for num in range(0, len(URLs)): #len(URLs)
                 docId = docId + 1
                 doc = ac.article('', date, '', URLs[num], docId)
                 curpage = requests.get(doc.URL)
@@ -46,9 +48,18 @@ for yr in range(2013, 2014):
                 if(doc.Text and not doc.Title==doc.Text):
                     print doc.id
                     daydocs = daydocs + 1
-                    f = open(str(doc.Date)+'_'+str(doc.id)+'.txt', 'w')
+                    f = open('output/'+str(doc.Date)+'_'+str(doc.id)+'.txt', 'w')
                     #f.write(str(doc.id) + "," + str(doc.Date) + ',\"' + doc.Title.encode('utf-8') + '\",\"' + doc.Text.encode('utf-8') + '\"\n')
-                    f.write(doc.Title.encode('utf-8') + ', ' + doc.Text.encode('utf-8') + '\n')
+                    
+                    raw = re.sub('[^A-Za-z]+', ' ', doc.Text)
+                    raw = raw.lower()
+                    tokens = raw.split()
+
+
+                    porter = nltk.PorterStemmer()
+                    raw = " ".join([porter.stem(t) for t in tokens])
+
+                    f.write(doc.Title.encode('utf-8') + ', ' + raw.encode('utf-8') + '\n')
                     f.close()
             seqfile.write(str(daydocs)+'\n')
 seqfile.close()
