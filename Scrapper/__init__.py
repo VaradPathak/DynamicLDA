@@ -69,11 +69,6 @@ for yr in range(theyear, theyear + 1):
 
                     docText = " ".join([stem(t) for t in tokens])
 
-                    rawTitle = re.sub('[^A-Za-z]+', ' ', doc.Title)
-                    rawTitle = rawTitle.lower()
-                    tokens = rawTitle.split()
-                    rawTitle = " ".join([stem(t) for t in tokens])
-
                     f.write(docText.encode('utf-8') + '\n')
 
             f.close()
