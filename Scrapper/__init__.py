@@ -3,6 +3,7 @@ import requests
 import article as ac
 import nltk
 import re
+from stemming.porter2 import stem
 
 
 docId = 0  
@@ -55,9 +56,7 @@ for yr in range(2013, 2014):
                     raw = raw.lower()
                     tokens = raw.split()
 
-
-                    porter = nltk.PorterStemmer()
-                    raw = " ".join([porter.stem(t) for t in tokens])
+                    raw = " ".join([stem(t) for t in tokens])
 
                     f.write(doc.Title.encode('utf-8') + ', ' + raw.encode('utf-8') + '\n')
                     f.close()
