@@ -18,7 +18,8 @@ for fileName in files:
 stopwordsFile = open('stopwords', 'a')
 for term in vocabDict:
     if vocabDict[term] < 26:
-        print term
+#         print term
         stopwordsFile.write(term.encode('utf-8') + '\n')
-
+    if vocabDict[term] < 100000:
+        print term
 stopwordsFile.close()

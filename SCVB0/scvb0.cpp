@@ -7,6 +7,7 @@
 #include<fstream>
 #include<string>
 #include<time.h>
+#include <random>
 using namespace std;
 
 double diffclock(clock_t clock1, clock_t clock2) {
@@ -58,6 +59,13 @@ int main(int argc, char* argv[]) {
 	M = 100; //343 works for KOS and only for KOS
 	eta = 0.01; // was 0.01
 	alpha = 0.1;
+
+	//Generate Numbers according to Gaussian Distribution
+	std::default_random_engine generator;
+	std::normal_distribution<double> distribution(5.0, 2.0);
+
+	double number = distribution(generator);
+
 
 	//if user also specified a minibatch size
 	if (argc == 5 || argc == 6) {
