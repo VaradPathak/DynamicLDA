@@ -5,7 +5,7 @@ import sys
 import random
 import nltk
 import re
-from porter2 import stem
+from stemming.porter2 import stem
 
 
 docId = 0  

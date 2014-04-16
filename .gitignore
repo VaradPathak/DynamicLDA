@@ -6,3 +6,5 @@
 *.txt
 #eclipse files
 .settings/
+*~
+.cproject
