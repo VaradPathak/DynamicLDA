@@ -21,6 +21,34 @@ double diffclock(clock_t clock1, clock_t clock2) {
 // Initialize number of documents, topics and words in vocabulary
 unsigned int W, D, K;
 
+void Transform(float** Beta_t, float** nPi) {
+	float* Beta_Total = new float[K];
+	for (unsigned int q = 0; q < K; ++q) {
+		for (unsigned int p = 0; p < W; ++p) {
+			Beta_Total[q] += exp(Beta_t[p][q]);
+		}
+	}
+	for (unsigned int p = 0; p < W; ++p) {
+		for (unsigned int q = 0; q < K; ++q) {
+			nPi[p][q] = pow(2, Beta_t[p][q]) / Beta_Total[q];
+		}
+	}
+}
+
+void InverseTransform(float** Pi, float** Beta_t) {
+	float* Pi_Total = new float[K];
+	for (unsigned int q = 0; q < K; ++q) {
+		for (unsigned int p = 0; p < W; ++p) {
+			Pi_Total[q] += Pi[p][q];
+		}
+	}
+	for (unsigned int p = 0; p < W; ++p) {
+		for (unsigned int q = 0; q < K; ++q) {
+			Beta_t[p][q] = log(Pi[p][q] / Pi_Total[q]) / log(2);
+		}
+	}
+}
+
 int main(int argc, char* argv[]) {
 	if (argc < 4) {
 		printf("Usage: ./fastLDA inputfile num_iterations num_topics\n");
@@ -30,13 +58,13 @@ int main(int argc, char* argv[]) {
 	// Initlialize expected topic counts per document
 	float **nTheta;
 	// Dynamically
-	float **nPhi;
+	float **nPi;
 	float *N_z;
 	// Initialize estimates from each minibatch
 	// Initialize step sizes
 	float rhoTheta = 0;
 	float rhoPhi = 0;
-//	float **phi;
+	float **Pi;
 	float **theta;
 	float *perplexities;
 	// Initlalize dirichlet prior parameters
@@ -101,12 +129,12 @@ int main(int argc, char* argv[]) {
 	printf("Number of documents: %d\n", D);
 	printf("Vocabulary size: %d\n", W);
 
-//	// Dynamically allocate phi
-//	phi = new float*[W];
-////#pragma omp parallel for
-//	for (w = 0; w < W; w++) {
-//		phi[w] = new float[K];
-//	}
+	// Dynamically allocate phi
+	Pi = new float*[W];
+//#pragma omp parallel for
+	for (w = 0; w < W; w++) {
+		Pi[w] = new float[K];
+	}
 
 	printf("allocated phi\n");
 
@@ -142,34 +170,35 @@ int main(int argc, char* argv[]) {
 
 	//Generate Numbers according to Gaussian Distribution
 	std::default_random_engine generator;
-	float **nPhi_t_1 = new float*[W];
-	float **nPhi_t = new float*[W];
+	float **Beta_t_1 = new float*[W];
+	float **Beta_t = new float*[W];
 	for (i = 0; i < W; i++) {
-		nPhi_t_1[i] = new float[K];
-		nPhi_t[i] = new float[K];
+		Beta_t_1[i] = new float[K];
+		Beta_t[i] = new float[K];
+	}
+	for (unsigned int p = 0; p < W; ++p) {
+		for (unsigned int q = 0; q < K; ++q) {
+			Beta_t_1[p][q] = rand() % 10;
+		}
 	}
 	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
-//		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
+		cout << months[timeSlice] << " " << numOfDocs[timeSlice] << endl;
 
 		for (unsigned int word = 0; word < W; ++word) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
-				normal_distribution<double> distribution(nPhi_t_1[word][topic],	4.0);
-				nPhi_t[word][topic] = distribution(generator);
+				normal_distribution<double> distribution(Beta_t_1[word][topic],	4.0);
+				Beta_t[word][topic] = distribution(generator);
 			}
 		}
 
 		// Initialize phi_est and all other arrays
-		nPhi = new float*[W];
+		nPi = new float*[W];
 
 		for (i = 0; i < W; i++) {
-			nPhi[i] = new float[K];
+			nPi[i] = new float[K];
 		}
 
-		for (i = 0; i < W; i++) {
-			for (k = 0; k < K; k++) {
-				nPhi[i][k] = rand() % 10;
-			}
-		}
+		Transform(Beta_t, nPi);
 
 		// Initialize n_z and n_z_est and other arrays
 		N_z = new float[K];
@@ -180,7 +209,7 @@ int main(int argc, char* argv[]) {
 		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
 			for (w = 0; w < W; w++) {
-				N_z[k] += nPhi[w][k];
+				N_z[k] += nPi[w][k];
 			}
 		}
 
@@ -255,7 +284,7 @@ int main(int argc, char* argv[]) {
 							float norm_sum = 0;
 
 							for (k = 0; k < K; k++) {
-								gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
 								norm_sum += gamma[k];
 							}
 
@@ -278,7 +307,7 @@ int main(int argc, char* argv[]) {
 							int m_aj = corpus[j][(2 * i) + 1];
 							norm_sum = 0;
 							for (k = 0; k < K; k++) {
-								gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
 								norm_sum += gamma[k];
 							}
 
@@ -302,7 +331,7 @@ int main(int argc, char* argv[]) {
 					// Update the estimates matrix
 					for (k = 0; k < K; k++) {
 						for (w = 0; w < W; w++) {
-							nPhi[w][k] = (1 - rhoPhi) * nPhi[w][k] + rhoPhi * nPhiHat[w][k];
+							nPi[w][k] = (1 - rhoPhi) * nPi[w][k] + rhoPhi * nPhiHat[w][k];
 						}
 #pragma omp atomic
 						N_z[k] *= (1 - rhoPhi);
@@ -317,11 +346,11 @@ int main(int argc, char* argv[]) {
 				for (k = 0; k < K; k++) {
 					norm_sum = 0;
 					for (w = 0; w < W; w++) {
-						nPhi[w][k] += eta;
-						norm_sum += nPhi[w][k];
+						nPi[w][k] += eta;
+						norm_sum += nPi[w][k];
 					}
 					for (w = 0; w < W; w++) {
-						nPhi_t[w][k] = (float) nPhi[w][k] / norm_sum;
+						Pi[w][k] = (float) nPi[w][k] / norm_sum;
 					}
 				}
 
@@ -358,7 +387,7 @@ int main(int argc, char* argv[]) {
 				for (i = 0; i < corpus_expanded[j].size(); i++) {
 					innerval = 0;
 					for (k = 0; k < K; k++) {
-						innerval += (theta[j][k] * nPhi_t[corpus_expanded[j][i]][k]);
+						innerval += (theta[j][k] * Pi[corpus_expanded[j][i]][k]);
 					}
 					perplexityval += (log(innerval) / log(2));
 				}
@@ -402,12 +431,12 @@ int main(int argc, char* argv[]) {
 				float max = -1;
 				int max_idx = -1;
 				for (w = 0; w < W; w++) {
-					if (nPhi_t[w][k] > max) {
-						max = nPhi_t[w][k];
+					if (Pi[w][k] > max) {
+						max = Pi[w][k];
 						max_idx = w;
 					}
 				}
-				nPhi_t[max_idx][k] = 0;
+				Pi[max_idx][k] = 0;
 				topwords[k][i] = max_idx;
 				maxval[k][i] = max;
 			}
@@ -456,9 +485,10 @@ int main(int argc, char* argv[]) {
 		}
 		tfile.close();
 
+		InverseTransform(Pi, Beta_t);
 		for (unsigned int word = 0; word < W; ++word) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
-				nPhi_t_1[word][topic] = nPhi_t[word][topic];
+				Beta_t_1[word][topic] = Beta_t[word][topic];
 			}
 		}
 	}
