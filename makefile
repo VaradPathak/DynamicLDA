@@ -5,4 +5,4 @@ serial: SCVB0/scvb0.cpp
 	g++ -o fastLDA SCVB0/scvb0.cpp -std=c++0x
 
 clean:
-	rm fastLDA
+	rm -f *.o fastLDA doctopics.txt perplexity.txt

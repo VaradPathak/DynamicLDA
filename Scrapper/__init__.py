@@ -17,6 +17,7 @@ if len(sys.argv) >= 4:
 
 else:
     print 'usage: python __init__.py year firstmonth num_months'
+    sys.exit(0)
 
 for yr in range(theyear, theyear + 1):
     year = 'http://www.reuters.com/resources/archive/us/' + str(yr)

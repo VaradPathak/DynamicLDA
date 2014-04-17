@@ -1,13 +1,15 @@
-#include<math.h>
-#include<vector>
-#include<stdio.h>
-#include<stdlib.h>
-#include<omp.h>
-#include<iostream>
-#include<fstream>
-#include<string>
-#include<time.h>
+#include <math.h>
+#include <vector>
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+#include <iostream>
+#include <fstream>
+#include <string.h>
+#include <time.h>
 #include <random>
+#include <cstring>
+#include <map>
 using namespace std;
 
 double diffclock(clock_t clock1, clock_t clock2) {
@@ -34,25 +36,20 @@ int main(int argc, char* argv[]) {
 	// Initialize step sizes
 	float rhoTheta = 0;
 	float rhoPhi = 0;
-	float *gamma_ij;
 	float **phi;
 	float **theta;
 	float *perplexities;
-	int cnt;
 	// Initlalize dirichlet prior parameters
 	float alpha, eta;
 	float M; // Number of documents in each minibatch
-	int j, Cj = 0, i, k, w;
+	int Cj = 0;
+	unsigned int i, j, k, w, MAXITER;
 	double norm_sum = 0;
 	int batch_idx = 0;
 	int C = 0;
-	int MAXITER;
 	int iter = 0;
-	unsigned int i_cnt = 0;
 	int NNZ;
 	float perplexityval, innerval;
-	time_t begin, end;
-	int m_aj;
 	ofstream pfile;
 	pfile.open("perplexity.txt");
 
@@ -60,12 +57,20 @@ int main(int argc, char* argv[]) {
 	eta = 0.01; // was 0.01
 	alpha = 0.1;
 
-	//Generate Numbers according to Gaussian Distribution
-	std::default_random_engine generator;
-	std::normal_distribution<double> distribution(5.0, 2.0);
-
-	double number = distribution(generator);
-
+	ifstream seqfile;
+	seqfile.open("Data/seqfile.txt");
+	string newline = "";
+	vector<int>* months = new vector<int>();
+	vector<int>* numOfDocs = new vector<int>();
+	while (seqfile >> newline) {
+		const char * ptr = strchr(newline.c_str(), ':');
+		int count = atoi(ptr + 1);
+		ptr = "\0";
+		int yearMonth = atoi(newline.c_str());
+		months->push_back(yearMonth);
+		numOfDocs->push_back(count);
+	}
+	seqfile.close();
 
 	//if user also specified a minibatch size
 	if (argc == 5 || argc == 6) {
@@ -135,297 +140,320 @@ int main(int argc, char* argv[]) {
 	}
 	fclose(fptr);
 
-	// Initialize phi_est and all other arrays
-	nPhi = new float*[W];
 
+	//Generate Numbers according to Gaussian Distribution
+	std::default_random_engine generator;
+	float **nPhi_t_1 = new float*[W];
+	float **nPhi_t = new float*[W];
 	for (i = 0; i < W; i++) {
-		nPhi[i] = new float[K];
+		nPhi_t_1[i] = new float[K];
+		nPhi_t[i] = new float[K];
 	}
+	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
+//		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
-	for (i = 0; i < W; i++) {
+		for (unsigned int word = 0; word < W; ++word) {
+			for (unsigned int topic = 0; topic < K; ++topic) {
+				normal_distribution<double> distribution(nPhi_t_1[word][topic],	4.0);
+				nPhi_t[word][topic] = distribution(generator);
+			}
+		}
+
+		// Initialize phi_est and all other arrays
+//		nPhi = new float*[W];
+//
+//		for (i = 0; i < W; i++) {
+//			nPhi[i] = new float[K];
+//		}
+//
+//		for (i = 0; i < W; i++) {
+//			for (k = 0; k < K; k++) {
+//				nPhi[i][k] = rand() % 10;
+//			}
+//		}
+
+		// Initialize n_z and n_z_est and other arrays
+		N_z = new float[K];
 		for (k = 0; k < K; k++) {
-			nPhi[i][k] = rand() % 10;
+			N_z[k] = 0;
 		}
-	}
 
-	// Initialize n_z and n_z_est and other arrays
-	N_z = new float[K];
-	for (k = 0; k < K; k++) {
-		N_z[k] = 0;
-	}
-
-	//if parallelizing this, make sure to avoid race condition (most likely use reduction)
-	for (k = 0; k < K; k++) {
-		for (w = 0; w < W; w++) {
-			N_z[k] += nPhi[w][k];
-		}
-	}
-
-	perplexities = new float[MAXITER];
-	for (i = 0; i < MAXITER; i++) {
-		perplexities[i] = 0;
-	}
-
-	nTheta = new float*[D];
-	for (i = 0; i < D; i++) {
-		nTheta[i] = new float[K];
-	}
-
-	for (i = 0; i < D; i++) {
+		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
-			nTheta[i][k] = rand() % 10;
+			for (w = 0; w < W; w++) {
+				N_z[k] += nPhi_t[w][k];
+			}
 		}
-	}
 
-	// Find the total number of word in the document
-	for (j = 0; j < D; j++) {
-		C += corpus_size[j];
-	}
+		perplexities = new float[MAXITER];
+		for (i = 0; i < MAXITER; i++) {
+			perplexities[i] = 0;
+		}
 
-	printf("Number of words in corpus: %d\n", C);
+		nTheta = new float*[D];
+		for (i = 0; i < D; i++) {
+			nTheta[i] = new float[K];
+		}
 
-	int firstdoc = 0;
-	int lastdoc = 0;
-	int DM = D / M;
+		for (i = 0; i < D; i++) {
+			for (k = 0; k < K; k++) {
+				nTheta[i][k] = rand() % 10;
+			}
+		}
 
-	for (iter = 0; iter < MAXITER; iter++) {
-		// Decide rho_phi and rho_theta
-		rhoPhi = 10 / pow((1000 + iter), 0.9);
-		rhoTheta = 1 / pow((10 + iter), 0.9);
+		// Find the total number of word in the document
+		for (j = 0; j < D; j++) {
+			C += corpus_size[j];
+		}
+
+		printf("Number of words in corpus: %d\n", C);
+
+		int firstdoc = 0;
+		int lastdoc = 0;
+		int DM = D / M;
+
+		for (iter = 0; iter < (int)MAXITER; iter++) {
+			// Decide rho_phi and rho_theta
+			rhoPhi = 10 / pow((1000 + iter), 0.9);
+			rhoTheta = 1 / pow((10 + iter), 0.9);
 
 #pragma omp parallel private(batch_idx,j,k,norm_sum,i,w,firstdoc,lastdoc)
-		{
-			float *gamma = new float[K];
-			float *nzHat = new float[K];
-			float **nPhiHat = new float *[W];
-			for (k = 0; k < K; k++) {
-				gamma[k] = 0;
-				nzHat[k] = 0;
-			}
-			for (i = 0; i < W; i++) {
-				nPhiHat[i] = new float[K];
+			{
+				float *gamma = new float[K];
+				float *nzHat = new float[K];
+				float **nPhiHat = new float *[W];
 				for (k = 0; k < K; k++) {
-					nPhiHat[i][k] = 0;
+					gamma[k] = 0;
+					nzHat[k] = 0;
 				}
-			}
+				for (i = 0; i < W; i++) {
+					nPhiHat[i] = new float[K];
+					for (k = 0; k < K; k++) {
+						nPhiHat[i][k] = 0;
+					}
+				}
 
 #pragma omp for
-			for (batch_idx = 0; batch_idx < DM; batch_idx++) {
+				for (batch_idx = 0; batch_idx < DM; batch_idx++) {
 
-				// Decide the document indices which go in each minibatch
-				firstdoc = batch_idx * M;
-				lastdoc = (batch_idx + 1) * M;
+					// Decide the document indices which go in each minibatch
+					firstdoc = batch_idx * M;
+					lastdoc = (batch_idx + 1) * M;
 
-				for (j = firstdoc; j < lastdoc; j++) {
+					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
-					// First perform the burn-in passes
-					// Iteration of burn in passes
+						// First perform the burn-in passes
+						// Iteration of burn in passes
 
-					// Store size of corpus in Cj
-					Cj = corpus_size[j];
+						// Store size of corpus in Cj
+						Cj = corpus_size[j];
 
-					for (i = 0; i < (corpus[j].size() / 2); i++) {// indexing is very different here!
+						for (i = 0; i < (corpus[j].size() / 2); i++) {// indexing is very different here!
 
-						int w_aj = corpus[j][2 * i];
-						int m_aj = corpus[j][(2 * i) + 1];
-						// Update gamma_ij and N_theta
-						float norm_sum = 0;
+							int w_aj = corpus[j][2 * i];
+							int m_aj = corpus[j][(2 * i) + 1];
+							// Update gamma_ij and N_theta
+							float norm_sum = 0;
 
-						for (k = 0; k < K; k++) {
-							gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
-							norm_sum += gamma[k];
+							for (k = 0; k < K; k++) {
+								gamma[k] = (nPhi_t[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								norm_sum += gamma[k];
+							}
+
+							for (k = 0; k < K; k++) {
+								gamma[k] = gamma[k] / norm_sum;
+							}
+
+							for (k = 0; k < K; k++) {
+
+								nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
+										+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
+							}
+
 						}
 
-						for (k = 0; k < K; k++) {
-							gamma[k] = gamma[k] / norm_sum;
+						// Iteration of the main loop
+						for (i = 0; i < (corpus[j].size() / 2); i++) { // indexing is very different here!
+
+							int w_aj = corpus[j][2 * i];
+							int m_aj = corpus[j][(2 * i) + 1];
+							norm_sum = 0;
+							for (k = 0; k < K; k++) {
+								gamma[k] = (nPhi_t[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								norm_sum += gamma[k];
+							}
+
+							for (k = 0; k < K; k++) {
+								gamma[k] = gamma[k] / norm_sum;
+							}
+
+							// Update N_theta estimates
+							for (k = 0; k < K; k++) {
+								nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
+										+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
+
+								nPhiHat[w_aj][k] = nPhiHat[w_aj][k] + (C * gamma[k] / M);
+
+								nzHat[k] = nzHat[k] + (C * gamma[k] / M);
+							}
 						}
 
-						for (k = 0; k < K; k++) {
+					} // End of j
 
-							nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
-									+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
+					// Update the estimates matrix
+					for (k = 0; k < K; k++) {
+						for (w = 0; w < W; w++) {
+							nPhi_t[w][k] = (1 - rhoPhi) * nPhi_t[w][k] + rhoPhi * nPhiHat[w][k];
 						}
-
+#pragma omp atomic
+						N_z[k] *= (1 - rhoPhi);
+#pragma omp atomic
+						N_z[k] += rhoPhi * nzHat[k];
 					}
 
-					// Iteration of the main loop
-					i_cnt = 0;
+				} // End of batch_idx
 
-					for (i = 0; i < (corpus[j].size() / 2); i++) { // indexing is very different here!
-
-						int w_aj = corpus[j][2 * i];
-						int m_aj = corpus[j][(2 * i) + 1];
-						norm_sum = 0;
-						for (k = 0; k < K; k++) {
-							gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
-							norm_sum += gamma[k];
-						}
-
-						for (k = 0; k < K; k++) {
-							gamma[k] = gamma[k] / norm_sum;
-						}
-
-						// Update N_theta estimates
-						for (k = 0; k < K; k++) {
-							nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
-									+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
-
-							nPhiHat[w_aj][k] = nPhiHat[w_aj][k] + (C * gamma[k] / M);
-
-							nzHat[k] = nzHat[k] + (C * gamma[k] / M);
-						}
-					}
-
-				} // End of j
-
-				// Update the estimates matrix
+				// Compute phi
+#pragma omp for
 				for (k = 0; k < K; k++) {
+					norm_sum = 0;
 					for (w = 0; w < W; w++) {
-						nPhi[w][k] = (1 - rhoPhi) * nPhi[w][k]
-								+ rhoPhi * nPhiHat[w][k];
+						nPhi_t[w][k] += eta;
+						norm_sum += nPhi_t[w][k];
 					}
-#pragma omp atomic
-					N_z[k] *= (1 - rhoPhi);
-#pragma omp atomic
-					N_z[k] += rhoPhi * nzHat[k];
+					for (w = 0; w < W; w++) {
+						phi[w][k] = (float) nPhi_t[w][k] / norm_sum;
+					}
 				}
 
-			} // End of batch_idx
-
-			// Compute phi
+				// Compute theta
 #pragma omp for
-			for (k = 0; k < K; k++) {
-				norm_sum = 0;
-				for (w = 0; w < W; w++) {
-					nPhi[w][k] += eta;
-					norm_sum += nPhi[w][k];
+				for (i = 0; i < D; i++) {
+					norm_sum = 0;
+					for (k = 0; k < K; k++) {
+						nTheta[i][k] += alpha;
+						norm_sum += nTheta[i][k];
+					}
+					for (k = 0; k < K; k++) {
+						theta[i][k] = (float) nTheta[i][k] / norm_sum;
+					}
 				}
-				for (w = 0; w < W; w++) {
-					phi[w][k] = (float) nPhi[w][k] / norm_sum;
+
+				delete[] gamma;
+				delete[] nzHat;
+
+				for (i = 0; i < W; i++) {
+					delete[] nPhiHat[i];
 				}
+
+				delete[] nPhiHat;
+
 			}
 
-			// Compute theta
-#pragma omp for
-			for (i = 0; i < D; i++) {
-				norm_sum = 0;
-				for (k = 0; k < K; k++) {
-					nTheta[i][k] += alpha;
-					norm_sum += nTheta[i][k];
-				}
-				for (k = 0; k < K; k++) {
-					theta[i][k] = (float) nTheta[i][k] / norm_sum;
-				}
-			}
-
-			delete[] gamma;
-			delete[] nzHat;
-
-			for (i = 0; i < W; i++) {
-				delete[] nPhiHat[i];
-			}
-
-			delete[] nPhiHat;
-
-		}
-
-		// Calculate the perplexity here
-		// Compute posterior means here
-		// Iterate over the corpus here
-		perplexityval = 0;
+			// Calculate the perplexity here
+			// Compute posterior means here
+			// Iterate over the corpus here
+			perplexityval = 0;
 #pragma omp parallel for private(j,i,k) reduction(+:innerval) reduction(+:perplexityval)
-		for (j = 0; j < D; j++) {
-			for (i = 0; i < corpus_expanded[j].size(); i++) {
-				innerval = 0;
-				for (k = 0; k < K; k++) {
-					innerval += (theta[j][k] * phi[corpus_expanded[j][i]][k]);
+			for (j = 0; j < D; j++) {
+				for (i = 0; i < corpus_expanded[j].size(); i++) {
+					innerval = 0;
+					for (k = 0; k < K; k++) {
+						innerval += (theta[j][k] * phi[corpus_expanded[j][i]][k]);
+					}
+					perplexityval += (log(innerval) / log(2));
 				}
-				perplexityval += (log(innerval) / log(2));
 			}
+			printf("%d,%f\n", iter, pow(2, -perplexityval / C));
+			perplexities[iter] = pow(2, -perplexityval / C);
+
+			pfile << iter + 1 << "," << perplexities[iter] << endl;
+			pfile.flush();
+
+		} // End of iter
+
+		//write doctopics file
+		ofstream dtfile;
+		dtfile.open("doctopics.txt");
+		for (i = 0; i < D; i++) {
+			for (k = 0; k < K; k++) {
+				dtfile << theta[i][k] << ",";
+			}
+			dtfile << endl;
 		}
-		printf("%d,%f\n", iter, pow(2, -perplexityval / C));
-		perplexities[iter] = pow(2, -perplexityval / C);
+		dtfile.close();
 
-		pfile << iter + 1 << "," << perplexities[iter] << endl;
-		pfile.flush();
-
-	} // End of iter
-
-	//write doctopics file
-	ofstream dtfile;
-	dtfile.open("doctopics.txt");
-	for (i = 0; i < D; i++) {
+		//compute the top 100 words for each topic
+		int** topwords;
+		float** maxval;
+		topwords = new int*[K];
+		maxval = new float*[K];
 		for (k = 0; k < K; k++) {
-			dtfile << theta[i][k] << ",";
+			topwords[k] = new int[100];
+			maxval[k] = new float[100];
 		}
-		dtfile << endl;
-	}
-	dtfile.close();
 
-	//compute the top 100 words for each topic
-	int** topwords;
-	float** maxval;
-	topwords = new int*[K];
-	maxval = new float*[K];
-	for (k = 0; k < K; k++) {
-		topwords[k] = new int[100];
-		maxval[k] = new float[100];
-	}
-
-	for (k = 0; k < K; k++) {
-		for (i = 0; i < 100; i++) {
-			float max = -1;
-			int max_idx = -1;
-			for (w = 0; w < W; w++) {
-				if (phi[w][k] > max) {
-					max = phi[w][k];
-					max_idx = w;
+		for (k = 0; k < K; k++) {
+			for (i = 0; i < 100; i++) {
+				float max = -1;
+				int max_idx = -1;
+				for (w = 0; w < W; w++) {
+					if (phi[w][k] > max) {
+						max = phi[w][k];
+						max_idx = w;
+					}
 				}
+				phi[max_idx][k] = 0;
+				topwords[k][i] = max_idx;
+				maxval[k][i] = max;
 			}
-			phi[max_idx][k] = 0;
-			topwords[k][i] = max_idx;
-			maxval[k][i] = max;
+		}
+
+		string *dict;
+		dict = new string[W];
+	//	char word;
+		//retrieve the words from the file
+		w = 0;
+		string line;
+		ifstream myfile(argv[5]);
+		if (myfile.is_open()) {
+			while (getline(myfile, line)) {
+				dict[w] = line;
+				w++;
+			}
+			myfile.close();
+		}
+	//	while (!feof(fptr)) {
+	//		fscanf(fptr, "%s\n", &word);
+	//		dict[w] = word;
+	//		w++;
+	//		printf("%d", w);
+	//	}
+		fclose(fptr);
+		//write topics file
+		ofstream tfile;
+		tfile.open("topics.txt");
+		for (k = 0; k < K; k++) {
+			for (w = 0; w < 100; w++) {
+				tfile << topwords[k][w] << ":" << maxval[k][w] << ",";
+
+			}
+			tfile << endl;
+
+			for (w = 0; w < 100; w++) {
+				tfile << dict[topwords[k][w]] << ",";
+			}
+
+			tfile << endl;
+		}
+		tfile.close();
+
+		for (unsigned int word = 0; word < W; ++word) {
+			for (unsigned int topic = 0; topic < K; ++topic) {
+				nPhi_t_1[word][topic] = nPhi_t[word][topic];
+			}
 		}
 	}
-
-	string *dict;
-	dict = new string[W];
-//	char word;
-	//retrieve the words from the file
-	w = 0;
-	string line;
-	ifstream myfile(argv[5]);
-	if (myfile.is_open()) {
-		while (getline(myfile, line)) {
-			dict[w] = line;
-			w++;
-		}
-		myfile.close();
-	}
-//	while (!feof(fptr)) {
-//		fscanf(fptr, "%s\n", &word);
-//		dict[w] = word;
-//		w++;
-//		printf("%d", w);
-//	}
-	fclose(fptr);
-	//write topics file
-	ofstream tfile;
-	tfile.open("topics.txt");
-	for (k = 0; k < K; k++) {
-		for (w = 0; w < 100; w++) {
-			tfile << topwords[k][w] << ":" << maxval[k][w] << ",";
-
-		}
-		tfile << endl;
-
-		for (w = 0; w < 100; w++) {
-			tfile << dict[topwords[k][w]] << ",";
-		}
-
-		tfile << endl;
-	}
-	tfile.close();
 
 	return (0);
 
