@@ -182,7 +182,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
-		cout << months[timeSlice] << " " << numOfDocs[timeSlice] << endl;
+		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
 		for (unsigned int word = 0; word < W; ++word) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
@@ -404,7 +404,7 @@ int main(int argc, char* argv[]) {
 
 		char* doctopicFileName = new char[27];
 		strcpy( doctopicFileName, "output/doctopic_" );
-		strcat(doctopicFileName, to_string(timeSlice).c_str());
+		strcat(doctopicFileName, to_string((*months)[timeSlice]).c_str());
 		strcat(doctopicFileName, ".txt");
 		ofstream dtfile;
 		dtfile.open(doctopicFileName);
@@ -467,7 +467,7 @@ int main(int argc, char* argv[]) {
 		ofstream tfile;
 		char* topicsFileName = new char[24];
 		strcpy(topicsFileName, "output/topics_");
-		strcat(topicsFileName, to_string(timeSlice).c_str());
+		strcat(topicsFileName, to_string((*months)[timeSlice]).c_str());
 		strcat(topicsFileName, ".txt");
 		tfile.open(topicsFileName);
 		for (k = 0; k < K; k++) {
