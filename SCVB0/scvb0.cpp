@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 	// Initialize step sizes
 	float rhoTheta = 0;
 	float rhoPhi = 0;
-	float **phi;
+//	float **phi;
 	float **theta;
 	float *perplexities;
 	// Initlalize dirichlet prior parameters
@@ -101,12 +101,12 @@ int main(int argc, char* argv[]) {
 	printf("Number of documents: %d\n", D);
 	printf("Vocabulary size: %d\n", W);
 
-	// Dynamically allocate phi
-	phi = new float*[W];
-//#pragma omp parallel for
-	for (w = 0; w < W; w++) {
-		phi[w] = new float[K];
-	}
+//	// Dynamically allocate phi
+//	phi = new float*[W];
+////#pragma omp parallel for
+//	for (w = 0; w < W; w++) {
+//		phi[w] = new float[K];
+//	}
 
 	printf("allocated phi\n");
 
@@ -140,7 +140,6 @@ int main(int argc, char* argv[]) {
 	}
 	fclose(fptr);
 
-
 	//Generate Numbers according to Gaussian Distribution
 	std::default_random_engine generator;
 	float **nPhi_t_1 = new float*[W];
@@ -160,17 +159,17 @@ int main(int argc, char* argv[]) {
 		}
 
 		// Initialize phi_est and all other arrays
-//		nPhi = new float*[W];
-//
-//		for (i = 0; i < W; i++) {
-//			nPhi[i] = new float[K];
-//		}
-//
-//		for (i = 0; i < W; i++) {
-//			for (k = 0; k < K; k++) {
-//				nPhi[i][k] = rand() % 10;
-//			}
-//		}
+		nPhi = new float*[W];
+
+		for (i = 0; i < W; i++) {
+			nPhi[i] = new float[K];
+		}
+
+		for (i = 0; i < W; i++) {
+			for (k = 0; k < K; k++) {
+				nPhi[i][k] = rand() % 10;
+			}
+		}
 
 		// Initialize n_z and n_z_est and other arrays
 		N_z = new float[K];
@@ -181,7 +180,7 @@ int main(int argc, char* argv[]) {
 		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
 			for (w = 0; w < W; w++) {
-				N_z[k] += nPhi_t[w][k];
+				N_z[k] += nPhi[w][k];
 			}
 		}
 
@@ -256,7 +255,7 @@ int main(int argc, char* argv[]) {
 							float norm_sum = 0;
 
 							for (k = 0; k < K; k++) {
-								gamma[k] = (nPhi_t[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
 								norm_sum += gamma[k];
 							}
 
@@ -279,7 +278,7 @@ int main(int argc, char* argv[]) {
 							int m_aj = corpus[j][(2 * i) + 1];
 							norm_sum = 0;
 							for (k = 0; k < K; k++) {
-								gamma[k] = (nPhi_t[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+								gamma[k] = (nPhi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
 								norm_sum += gamma[k];
 							}
 
@@ -303,7 +302,7 @@ int main(int argc, char* argv[]) {
 					// Update the estimates matrix
 					for (k = 0; k < K; k++) {
 						for (w = 0; w < W; w++) {
-							nPhi_t[w][k] = (1 - rhoPhi) * nPhi_t[w][k] + rhoPhi * nPhiHat[w][k];
+							nPhi[w][k] = (1 - rhoPhi) * nPhi[w][k] + rhoPhi * nPhiHat[w][k];
 						}
 #pragma omp atomic
 						N_z[k] *= (1 - rhoPhi);
@@ -318,11 +317,11 @@ int main(int argc, char* argv[]) {
 				for (k = 0; k < K; k++) {
 					norm_sum = 0;
 					for (w = 0; w < W; w++) {
-						nPhi_t[w][k] += eta;
-						norm_sum += nPhi_t[w][k];
+						nPhi[w][k] += eta;
+						norm_sum += nPhi[w][k];
 					}
 					for (w = 0; w < W; w++) {
-						phi[w][k] = (float) nPhi_t[w][k] / norm_sum;
+						nPhi_t[w][k] = (float) nPhi[w][k] / norm_sum;
 					}
 				}
 
@@ -359,7 +358,7 @@ int main(int argc, char* argv[]) {
 				for (i = 0; i < corpus_expanded[j].size(); i++) {
 					innerval = 0;
 					for (k = 0; k < K; k++) {
-						innerval += (theta[j][k] * phi[corpus_expanded[j][i]][k]);
+						innerval += (theta[j][k] * nPhi_t[corpus_expanded[j][i]][k]);
 					}
 					perplexityval += (log(innerval) / log(2));
 				}
@@ -373,8 +372,13 @@ int main(int argc, char* argv[]) {
 		} // End of iter
 
 		//write doctopics file
+
+		char* doctopicFileName = new char[27];
+		strcpy( doctopicFileName, "output/doctopic_" );
+		strcat(doctopicFileName, to_string(timeSlice).c_str());
+		strcat(doctopicFileName, ".txt");
 		ofstream dtfile;
-		dtfile.open("doctopics.txt");
+		dtfile.open(doctopicFileName);
 		for (i = 0; i < D; i++) {
 			for (k = 0; k < K; k++) {
 				dtfile << theta[i][k] << ",";
@@ -398,12 +402,12 @@ int main(int argc, char* argv[]) {
 				float max = -1;
 				int max_idx = -1;
 				for (w = 0; w < W; w++) {
-					if (phi[w][k] > max) {
-						max = phi[w][k];
+					if (nPhi_t[w][k] > max) {
+						max = nPhi_t[w][k];
 						max_idx = w;
 					}
 				}
-				phi[max_idx][k] = 0;
+				nPhi_t[max_idx][k] = 0;
 				topwords[k][i] = max_idx;
 				maxval[k][i] = max;
 			}
@@ -429,10 +433,14 @@ int main(int argc, char* argv[]) {
 	//		w++;
 	//		printf("%d", w);
 	//	}
-		fclose(fptr);
+//		fclose(fptr);
 		//write topics file
 		ofstream tfile;
-		tfile.open("topics.txt");
+		char* topicsFileName = new char[24];
+		strcpy(topicsFileName, "output/topics_");
+		strcat(topicsFileName, to_string(timeSlice).c_str());
+		strcat(topicsFileName, ".txt");
+		tfile.open(topicsFileName);
 		for (k = 0; k < K; k++) {
 			for (w = 0; w < 100; w++) {
 				tfile << topwords[k][w] << ":" << maxval[k][w] << ",";

@@ -1,8 +1,8 @@
 all: SCVB0/scvb0.cpp
-	g++ -std=c++0x -fopenmp SCVB0/scvb0.cpp -o fastLDA
+	g++ -g -std=c++0x -fopenmp SCVB0/scvb0.cpp -o fastLDA
 
 serial: SCVB0/scvb0.cpp
-	g++ -o fastLDA SCVB0/scvb0.cpp -std=c++0x
+	g++ -g -o fastLDA SCVB0/scvb0.cpp -std=c++0x
 
 clean:
 	rm -f *.o fastLDA doctopics.txt perplexity.txt
