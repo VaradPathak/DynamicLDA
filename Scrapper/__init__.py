@@ -43,7 +43,7 @@ for yr in range(theyear, theyear + 1):
             # generate the random vector(python generate a sample without 
             # replacement from a range of numbers)
              
-            for num in random.sample(range(0, len(URLs)), int(len(URLs) / 10)):
+            for num in random.sample(range(0, len(URLs)), int(len(URLs))):
                 doc = ac.article('', date, '', URLs[num], -1)
                 curpage = requests.get(doc.URL)
                 curtree = html.fromstring(curpage.text)
