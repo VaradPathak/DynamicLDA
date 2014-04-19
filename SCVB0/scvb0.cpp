@@ -189,7 +189,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
-		cout << months[timeSlice] << " " << numOfDocs[timeSlice] << endl;
+		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
 		for (unsigned int word = 0; word < W; ++word) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
@@ -242,7 +242,7 @@ int main(int argc, char* argv[]) {
 
                 int monthD = monthLastDoc - monthFirstDoc;
 
-                C = 0;
+		C = 0;
 
 		for (j = monthFirstDoc; j < monthLastDoc; j++) {
 			C += corpus_size[j];
@@ -279,8 +279,8 @@ int main(int argc, char* argv[]) {
 				for (batch_idx = 0; batch_idx < DM; batch_idx++) {
 
 					// Decide the document indices which go in each minibatch
-                                        firstdoc = monthFirstDoc + (batch_idx * M);
-                                        lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
+					firstdoc = monthFirstDoc + (batch_idx * M);
+					lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
 
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
@@ -418,7 +418,7 @@ int main(int argc, char* argv[]) {
 
 		char* doctopicFileName = new char[27];
 		strcpy( doctopicFileName, "output/doctopic_" );
-		strcat(doctopicFileName, to_string(timeSlice).c_str());
+		strcat(doctopicFileName, to_string((*months)[timeSlice]).c_str());
 		strcat(doctopicFileName, ".txt");
 		ofstream dtfile;
 		dtfile.open(doctopicFileName);
@@ -481,7 +481,7 @@ int main(int argc, char* argv[]) {
 		ofstream tfile;
 		char* topicsFileName = new char[24];
 		strcpy(topicsFileName, "output/topics_");
-		strcat(topicsFileName, to_string(timeSlice).c_str());
+		strcat(topicsFileName, to_string((*months)[timeSlice]).c_str());
 		strcat(topicsFileName, ".txt");
 		tfile.open(topicsFileName);
 		for (k = 0; k < K; k++) {
