@@ -21,30 +21,33 @@ double diffclock(clock_t clock1, clock_t clock2) {
 // Initialize number of documents, topics and words in vocabulary
 unsigned int W, D, K;
 
-void Transform(float** Beta_t, float** nPi) {
-	float* Beta_Total = new float[K];
+void Transform(double** beta_t, double** npi) {
+	double* Beta_Total = new double[K];
 	for (unsigned int q = 0; q < K; ++q) {
 		for (unsigned int p = 0; p < W; ++p) {
-			Beta_Total[q] += exp(Beta_t[p][q]);
+			Beta_Total[q] += exp(beta_t[p][q]);
 		}
+		cout << "BetaTol: " << Beta_Total[q] << endl;
 	}
 	for (unsigned int p = 0; p < W; ++p) {
 		for (unsigned int q = 0; q < K; ++q) {
-			nPi[p][q] = pow(2, Beta_t[p][q]) / Beta_Total[q];
+			npi[p][q] = exp(beta_t[p][q]) / Beta_Total[q];
+//			if(npi[p][q] <= 0)
+//				cout << "nPi is "<< npi[p][q]<< " and Beta_t: " << beta_t[p][q] << endl;
 		}
 	}
 }
 
-void InverseTransform(float** Pi, float** Beta_t) {
-	float* Pi_Total = new float[K];
+void InverseTransform(double** pi, double** beta_t) {
+	double* Pi_Total = new double[K];
 	for (unsigned int q = 0; q < K; ++q) {
 		for (unsigned int p = 0; p < W; ++p) {
-			Pi_Total[q] += Pi[p][q];
+			Pi_Total[q] += pi[p][q];
 		}
 	}
 	for (unsigned int p = 0; p < W; ++p) {
 		for (unsigned int q = 0; q < K; ++q) {
-			Beta_t[p][q] = log(Pi[p][q] / Pi_Total[q]) / log(2);
+			beta_t[p][q] = log(pi[p][q] / Pi_Total[q]);
 		}
 	}
 }
@@ -56,20 +59,20 @@ int main(int argc, char* argv[]) {
 	}
 
 	// Initlialize expected topic counts per document
-	float **nTheta;
+	double **nTheta;
 	// Dynamically
-	float **nPi;
-	float *N_z;
+	double **nPi;
+	double *N_z;
 	// Initialize estimates from each minibatch
 	// Initialize step sizes
-	float rhoTheta = 0;
-	float rhoPhi = 0;
-	float **Pi;
-	float **theta;
-	float **perplexities;
+	double rhoTheta = 0;
+	double rhoPhi = 0;
+	double **Pi;
+	double **theta;
+	double **perplexities;
 	// Initlalize dirichlet prior parameters
-	float alpha, eta;
-	float M; // Number of documents in each minibatch
+	double alpha, eta;
+	double M; // Number of documents in each minibatch
 	int Cj = 0;
 	unsigned int i, j, k, w, MAXITER;
 	double norm_sum = 0;
@@ -77,7 +80,7 @@ int main(int argc, char* argv[]) {
 	int C = 0;
 	int iter = 0;
 	int NNZ;
-	float perplexityval, innerval;
+	double perplexityval, innerval;
 	ofstream pfile;
 	pfile.open("perplexity.txt");
 
@@ -137,20 +140,20 @@ int main(int argc, char* argv[]) {
 	printf("Vocabulary size: %d\n", W);
 
 	// Dynamically allocate phi
-	Pi = new float*[W];
+	Pi = new double*[W];
 //#pragma omp parallel for
 	for (w = 0; w < W; w++) {
-		Pi[w] = new float[K];
+		Pi[w] = new double[K];
 	}
 
 	printf("allocated phi\n");
 
 	// Dynamically allocate theta
 
-	theta = new float*[D];
+	theta = new double*[D];
 //#pragma omp parallel for
 	for (i = 0; i < D; i++) {
-		theta[i] = new float[K];
+		theta[i] = new double[K];
 	}
 
 	printf("allocated theta\n");
@@ -175,13 +178,49 @@ int main(int argc, char* argv[]) {
 	}
 	fclose(fptr);
 
+
+	// Initialize phi_est and all other arrays
+	nPi = new double*[W];
+
+	for (i = 0; i < W; i++) {
+		nPi[i] = new double[K];
+	}
+
+	// Initialize n_z and n_z_est and other arrays
+	N_z = new double[K];
+	for (k = 0; k < K; k++) {
+		N_z[k] = 0;
+	}
+
+	nTheta = new double*[D];
+	for (i = 0; i < D; i++) {
+		nTheta[i] = new double[K];
+	}
+
+	for (i = 0; i < D; i++) {
+		for (k = 0; k < K; k++) {
+			nTheta[i][k] = rand() % 10;
+		}
+	}
+
+	perplexities = new double*[months->size()];
+	for (i = 0; i < months->size(); i++) {
+		perplexities[i] = new double[K];
+		for (int a = 0; a < K; ++a) {
+			perplexities[i][a] = 0;
+		}
+	}
+
+	int*** topwords;
+	topwords = new int**[months->size()];
+
 	//Generate Numbers according to Gaussian Distribution
 	std::default_random_engine generator;
-	float **Beta_t_1 = new float*[W];
-	float **Beta_t = new float*[W];
+	double **Beta_t_1 = new double*[W];
+	double **Beta_t = new double*[W];
 	for (i = 0; i < W; i++) {
-		Beta_t_1[i] = new float[K];
-		Beta_t[i] = new float[K];
+		Beta_t_1[i] = new double[K];
+		Beta_t[i] = new double[K];
 	}
 	for (unsigned int p = 0; p < W; ++p) {
 		for (unsigned int q = 0; q < K; ++q) {
@@ -195,23 +234,11 @@ int main(int argc, char* argv[]) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
 				normal_distribution<double> distribution(Beta_t_1[word][topic],	4.0);
 				Beta_t[word][topic] = distribution(generator);
+//				cout<<Beta_t[word][topic]<<endl;
 			}
 		}
 
-		// Initialize phi_est and all other arrays
-		nPi = new float*[W];
-
-		for (i = 0; i < W; i++) {
-			nPi[i] = new float[K];
-		}
-
 		Transform(Beta_t, nPi);
-
-		// Initialize n_z and n_z_est and other arrays
-		N_z = new float[K];
-		for (k = 0; k < K; k++) {
-			N_z[k] = 0;
-		}
 
 		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
@@ -220,30 +247,11 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		perplexities = new float*[months->size()];
-		for (i = 0; i < months->size(); i++) {
-			perplexities[i] = new float[K];
-			for (int a = 0; a < K; ++a) {
-				perplexities[i][a] = 0;
-			}
-		}
-
-		nTheta = new float*[D];
-		for (i = 0; i < D; i++) {
-			nTheta[i] = new float[K];
-		}
-
-		for (i = 0; i < D; i++) {
-			for (k = 0; k < K; k++) {
-				nTheta[i][k] = rand() % 10;
-			}
-		}
-
 		// Find the total number of word in the document
-                int monthFirstDoc = monthFirstIdx->at(timeSlice);
-                int monthLastDoc = monthLastIdx->at(timeSlice);
+		int monthFirstDoc = monthFirstIdx->at(timeSlice);
+		int monthLastDoc = monthLastIdx->at(timeSlice);
 
-                int monthD = monthLastDoc - monthFirstDoc;
+		int monthD = monthLastDoc - monthFirstDoc;
 
 		C = 0;
 
@@ -264,15 +272,15 @@ int main(int argc, char* argv[]) {
 
 #pragma omp parallel private(batch_idx,j,k,norm_sum,i,w,firstdoc,lastdoc)
 			{
-				float *gamma = new float[K];
-				float *nzHat = new float[K];
-				float **nPhiHat = new float *[W];
+				double *gamma = new double[K];
+				double *nzHat = new double[K];
+				double **nPhiHat = new double *[W];
 				for (k = 0; k < K; k++) {
 					gamma[k] = 0;
 					nzHat[k] = 0;
 				}
 				for (i = 0; i < W; i++) {
-					nPhiHat[i] = new float[K];
+					nPhiHat[i] = new double[K];
 					for (k = 0; k < K; k++) {
 						nPhiHat[i][k] = 0;
 					}
@@ -285,9 +293,9 @@ int main(int argc, char* argv[]) {
 					firstdoc = monthFirstDoc + (batch_idx * M);
 					lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
 
-                                        if (batch_idx == DM) {
-                                            lastdoc = monthLastDoc;
-                                        }
+					if (batch_idx == DM) {
+						lastdoc = monthLastDoc;
+					}
 
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
@@ -302,15 +310,15 @@ int main(int argc, char* argv[]) {
 							int w_aj = corpus[j][2 * i];
 							int m_aj = corpus[j][(2 * i) + 1];
 							// Update gamma_ij and N_theta
-							float norm_sum = 0;
+							double normSum = 0;
 
 							for (k = 0; k < K; k++) {
 								gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
-								norm_sum += gamma[k];
+								normSum += gamma[k];
 							}
 
 							for (k = 0; k < K; k++) {
-								gamma[k] = gamma[k] / norm_sum;
+								gamma[k] = gamma[k] / normSum;
 							}
 
 							for (k = 0; k < K; k++) {
@@ -326,14 +334,14 @@ int main(int argc, char* argv[]) {
 
 							int w_aj = corpus[j][2 * i];
 							int m_aj = corpus[j][(2 * i) + 1];
-							norm_sum = 0;
+							double normSum = 0;
 							for (k = 0; k < K; k++) {
 								gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
-								norm_sum += gamma[k];
+								normSum += gamma[k];
 							}
 
 							for (k = 0; k < K; k++) {
-								gamma[k] = gamma[k] / norm_sum;
+								gamma[k] = gamma[k] / normSum;
 							}
 
 							// Update N_theta estimates
@@ -365,26 +373,27 @@ int main(int argc, char* argv[]) {
 				// Compute phi
 #pragma omp for
 				for (k = 0; k < K; k++) {
-					norm_sum = 0;
+					double normSum = 0;
 					for (w = 0; w < W; w++) {
 						nPi[w][k] += eta;
-						norm_sum += nPi[w][k];
+						normSum += nPi[w][k];
 					}
+//					cout << normSum << endl;
 					for (w = 0; w < W; w++) {
-						Pi[w][k] = (float) nPi[w][k] / norm_sum;
+						Pi[w][k] = (double) nPi[w][k] / normSum;
 					}
 				}
 
 				// Compute theta
 #pragma omp for
 				for (i = monthFirstDoc; i < monthLastDoc; i++) {
-					norm_sum = 0;
+					double normSum = 0;
 					for (k = 0; k < K; k++) {
 						nTheta[i][k] += alpha;
-						norm_sum += nTheta[i][k];
+						normSum += nTheta[i][k];
 					}
 					for (k = 0; k < K; k++) {
-						theta[i][k] = (float) nTheta[i][k] / norm_sum;
+						theta[i][k] = (double) nTheta[i][k] / normSum;
 					}
 				}
 
@@ -422,34 +431,28 @@ int main(int argc, char* argv[]) {
 		} // End of iter
 
 		//write doctopics file
-
-		char* doctopicFileName = new char[27];
-		strcpy( doctopicFileName, "output/doctopic_" );
-		strcat(doctopicFileName, to_string((*months)[timeSlice]).c_str());
-		strcat(doctopicFileName, ".txt");
-		ofstream dtfile;
-		dtfile.open(doctopicFileName);
-		for (i = 0; i < D; i++) {
+		/*ofstream dtfile;
+		dtfile.open("output/doctopic_" + to_string(months->at(timeSlice)) + ".txt");
+		for (i = monthFirstDoc; i < monthLastDoc; i++) {
 			for (k = 0; k < K; k++) {
 				dtfile << theta[i][k] << ",";
 			}
 			dtfile << endl;
 		}
-		dtfile.close();
+		dtfile.close();*/
 
 		//compute the top 100 words for each topic
-		int** topwords;
-		float** maxval;
-		topwords = new int*[K];
-		maxval = new float*[K];
-		for (k = 0; k < K; k++) {
-			topwords[k] = new int[100];
-			maxval[k] = new float[100];
-		}
 
+		double** maxval;
+		topwords[timeSlice] = new int*[K];
+		maxval = new double*[K];
+		for (k = 0; k < K; k++) {
+			topwords[timeSlice][k] = new int[100];
+			maxval[k] = new double[100];
+		}
 		for (k = 0; k < K; k++) {
 			for (i = 0; i < 100; i++) {
-				float max = -1;
+				double max = -1;
 				int max_idx = -1;
 				for (w = 0; w < W; w++) {
 					if (Pi[w][k] > max) {
@@ -458,53 +461,10 @@ int main(int argc, char* argv[]) {
 					}
 				}
 				Pi[max_idx][k] = 0;
-				topwords[k][i] = max_idx;
+				topwords[timeSlice][k][i] = max_idx;
 				maxval[k][i] = max;
 			}
 		}
-
-		string *dict;
-		dict = new string[W];
-	//	char word;
-		//retrieve the words from the file
-		w = 0;
-		string line;
-		ifstream vocabFile(argv[5]);
-		if (vocabFile.is_open()) {
-			while (getline(vocabFile, line)) {
-				dict[w] = line;
-				w++;
-			}
-			vocabFile.close();
-		}
-	//	while (!feof(fptr)) {
-	//		fscanf(fptr, "%s\n", &word);
-	//		dict[w] = word;
-	//		w++;
-	//		printf("%d", w);
-	//	}
-//		fclose(fptr);
-		//write topics file
-		ofstream tfile;
-		char* topicsFileName = new char[24];
-		strcpy(topicsFileName, "output/topics_");
-		strcat(topicsFileName, to_string((*months)[timeSlice]).c_str());
-		strcat(topicsFileName, ".txt");
-		tfile.open(topicsFileName);
-		for (k = 0; k < K; k++) {
-			for (w = 0; w < 100; w++) {
-				tfile << topwords[k][w] << ":" << maxval[k][w] << ",";
-
-			}
-			tfile << endl;
-
-			for (w = 0; w < 100; w++) {
-				tfile << dict[topwords[k][w]] << ",";
-			}
-
-			tfile << endl;
-		}
-		tfile.close();
 
 		InverseTransform(Pi, Beta_t);
 		for (unsigned int word = 0; word < W; ++word) {
@@ -512,6 +472,40 @@ int main(int argc, char* argv[]) {
 				Beta_t_1[word][topic] = Beta_t[word][topic];
 			}
 		}
+	}
+	string *dict;
+	dict = new string[W];
+//	char word;
+	//retrieve the words from the file
+	w = 0;
+	string line;
+	ifstream vocabFile(argv[5]);
+	if (vocabFile.is_open()) {
+		while (getline(vocabFile, line)) {
+			dict[w] = line;
+			w++;
+		}
+		vocabFile.close();
+	}
+
+//	write topics file
+	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
+		ofstream tfile;
+		tfile.open("output/topics_" + to_string(months->at(timeSlice)) + ".txt");
+		for (k = 0; k < K; k++) {
+			for (w = 0; w < 100; w++) {
+				tfile << topwords[timeSlice][k][w];// << ":" << maxval[k][w] << ",";
+
+			}
+			tfile << endl;
+
+			for (w = 0; w < 100; w++) {
+				tfile << dict[topwords[timeSlice][k][w]] << ",";
+			}
+
+			tfile << endl;
+		}
+		tfile.close();
 	}
 
 	return (0);
