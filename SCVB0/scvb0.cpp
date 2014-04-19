@@ -90,6 +90,10 @@ int main(int argc, char* argv[]) {
 	string newline = "";
 	vector<int>* months = new vector<int>();
 	vector<int>* numOfDocs = new vector<int>();
+        vector<int>* monthFirstIdx = new vector<int>();
+        vector<int>* monthLastIdx = new vector<int>();
+        int curIdx = 0;
+
 	while (seqfile >> newline) {
 		const char * ptr = strchr(newline.c_str(), ':');
 		int count = atoi(ptr + 1);
@@ -97,6 +101,9 @@ int main(int argc, char* argv[]) {
 		int yearMonth = atoi(newline.c_str());
 		months->push_back(yearMonth);
 		numOfDocs->push_back(count);
+                monthFirstIdx->push_back(curIdx);
+                monthLastIdx->push_back(curIdx+count);
+                curIdx += count;
 	}
 	seqfile.close();
 
@@ -230,7 +237,14 @@ int main(int argc, char* argv[]) {
 		}
 
 		// Find the total number of word in the document
-		for (j = 0; j < D; j++) {
+                int monthFirstDoc = monthFirstIdx(timeSlice);
+                int monthLastDoc = monthLastIdx(timeSlice);
+
+                monthD = monthLastDoc - monthFirstDoc;
+
+                C = 0;
+
+		for (j = monthFirstDoc; j < monthLastDoc; j++) {
 			C += corpus_size[j];
 		}
 
@@ -238,7 +252,7 @@ int main(int argc, char* argv[]) {
 
 		int firstdoc = 0;
 		int lastdoc = 0;
-		int DM = D / M;
+		int DM = monthD / M;
 
 		for (iter = 0; iter < (int)MAXITER; iter++) {
 			// Decide rho_phi and rho_theta
@@ -265,8 +279,8 @@ int main(int argc, char* argv[]) {
 				for (batch_idx = 0; batch_idx < DM; batch_idx++) {
 
 					// Decide the document indices which go in each minibatch
-					firstdoc = batch_idx * M;
-					lastdoc = (batch_idx + 1) * M;
+                                        firstdoc = monthFirstDoc + (batch_idx * M);
+                                        lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
 
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
