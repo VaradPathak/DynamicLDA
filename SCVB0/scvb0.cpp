@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
 	float rhoPhi = 0;
 	float **Pi;
 	float **theta;
-	float *perplexities;
+	float **perplexities;
 	// Initlalize dirichlet prior parameters
 	float alpha, eta;
 	float M; // Number of documents in each minibatch
@@ -220,9 +220,12 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		perplexities = new float[MAXITER];
-		for (i = 0; i < MAXITER; i++) {
-			perplexities[i] = 0;
+		perplexities = new float*[months->size()];
+		for (i = 0; i < months->size(); i++) {
+			perplexities[i] = new float[K];
+			for (int a = 0; a < K; ++a) {
+				perplexities[i][a] = 0;
+			}
 		}
 
 		nTheta = new float*[D];
@@ -407,9 +410,9 @@ int main(int argc, char* argv[]) {
 				}
 			}
 			printf("%d,%f\n", iter, pow(2, -perplexityval / C));
-			perplexities[iter] = pow(2, -perplexityval / C);
+			perplexities[timeSlice][iter] = pow(2, -perplexityval / C);
 
-			pfile << iter + 1 << "," << perplexities[iter] << endl;
+			pfile << iter + 1 << "," << perplexities[timeSlice][iter] << endl;
 			pfile.flush();
 
 		} // End of iter
