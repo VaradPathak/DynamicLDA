@@ -469,13 +469,13 @@ int main(int argc, char* argv[]) {
 		//retrieve the words from the file
 		w = 0;
 		string line;
-		ifstream myfile(argv[5]);
-		if (myfile.is_open()) {
-			while (getline(myfile, line)) {
+		ifstream vocabFile(argv[5]);
+		if (vocabFile.is_open()) {
+			while (getline(vocabFile, line)) {
 				dict[w] = line;
 				w++;
 			}
-			myfile.close();
+			vocabFile.close();
 		}
 	//	while (!feof(fptr)) {
 	//		fscanf(fptr, "%s\n", &word);
