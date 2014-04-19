@@ -237,12 +237,12 @@ int main(int argc, char* argv[]) {
 		}
 
 		// Find the total number of word in the document
-                int monthFirstDoc = monthFirstIdx(timeSlice);
-                int monthLastDoc = monthLastIdx(timeSlice);
+		int monthFirstDoc = (*monthFirstIdx)[timeSlice];
+		int monthLastDoc = (*monthLastIdx)[timeSlice];
 
-                monthD = monthLastDoc - monthFirstDoc;
+		int monthD = monthLastDoc - monthFirstDoc;
 
-                C = 0;
+		C = 0;
 
 		for (j = monthFirstDoc; j < monthLastDoc; j++) {
 			C += corpus_size[j];
@@ -279,8 +279,8 @@ int main(int argc, char* argv[]) {
 				for (batch_idx = 0; batch_idx < DM; batch_idx++) {
 
 					// Decide the document indices which go in each minibatch
-                                        firstdoc = monthFirstDoc + (batch_idx * M);
-                                        lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
+					firstdoc = monthFirstDoc + (batch_idx * M);
+					lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
 
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
