@@ -237,10 +237,10 @@ int main(int argc, char* argv[]) {
 		}
 
 		// Find the total number of word in the document
-                int monthFirstDoc = monthFirstIdx(timeSlice);
-                int monthLastDoc = monthLastIdx(timeSlice);
+                int monthFirstDoc = monthFirstIdx->at(timeSlice);
+                int monthLastDoc = monthLastIdx->at(timeSlice);
 
-                monthD = monthLastDoc - monthFirstDoc;
+                int monthD = monthLastDoc - monthFirstDoc;
 
                 C = 0;
 
@@ -370,7 +370,7 @@ int main(int argc, char* argv[]) {
 
 				// Compute theta
 #pragma omp for
-				for (i = 0; i < D; i++) {
+				for (i = monthFirstDoc; i < monthLastDoc; i++) {
 					norm_sum = 0;
 					for (k = 0; k < K; k++) {
 						nTheta[i][k] += alpha;
