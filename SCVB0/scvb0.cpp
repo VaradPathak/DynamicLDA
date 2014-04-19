@@ -397,7 +397,7 @@ int main(int argc, char* argv[]) {
 			// Iterate over the corpus here
 			perplexityval = 0;
 #pragma omp parallel for private(j,i,k) reduction(+:innerval) reduction(+:perplexityval)
-			for (j = 0; j < D; j++) {
+			for (j = monthFirstDoc; j < monthLastDoc; j++) {
 				for (i = 0; i < corpus_expanded[j].size(); i++) {
 					innerval = 0;
 					for (k = 0; k < K; k++) {
