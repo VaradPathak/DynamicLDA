@@ -279,11 +279,15 @@ int main(int argc, char* argv[]) {
 				}
 
 #pragma omp for
-				for (batch_idx = 0; batch_idx < DM; batch_idx++) {
+				for (batch_idx = 0; batch_idx < DM+1; batch_idx++) {
 
 					// Decide the document indices which go in each minibatch
 					firstdoc = monthFirstDoc + (batch_idx * M);
 					lastdoc = monthFirstDoc + ((batch_idx + 1) * M);
+
+                                        if (batch_idx == DM) {
+                                            lastdoc = monthLastDoc;
+                                        }
 
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
