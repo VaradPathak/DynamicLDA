@@ -296,7 +296,7 @@ int main(int argc, char* argv[]) {
 					if (batch_idx == DM) {
 						lastdoc = monthLastDoc;
 					}
-
+					cout<<"lastdoc: "<<lastdoc<<endl;
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
 						// First perform the burn-in passes
@@ -451,16 +451,17 @@ int main(int argc, char* argv[]) {
 			maxval[k] = new double[100];
 		}
 		for (k = 0; k < K; k++) {
+			double oldMax = std::numeric_limits<double>::max();
 			for (i = 0; i < 100; i++) {
 				double max = -1;
 				int max_idx = -1;
 				for (w = 0; w < W; w++) {
-					if (Pi[w][k] > max) {
+					if ((oldMax > Pi[w][k]) && (Pi[w][k] > max)) {
 						max = Pi[w][k];
 						max_idx = w;
 					}
 				}
-				Pi[max_idx][k] = 0;
+				oldMax = Pi[max_idx][k];
 				topwords[timeSlice][k][i] = max_idx;
 				maxval[k][i] = max;
 			}
