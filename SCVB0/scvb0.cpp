@@ -212,6 +212,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	int*** topwords;
+	double** maxval;
 	topwords = new int**[months->size()];
 
 	//Generate Numbers according to Gaussian Distribution
@@ -443,7 +444,6 @@ int main(int argc, char* argv[]) {
 
 		//compute the top 100 words for each topic
 
-		double** maxval;
 		topwords[timeSlice] = new int*[K];
 		maxval = new double*[K];
 		for (k = 0; k < K; k++) {
@@ -495,7 +495,7 @@ int main(int argc, char* argv[]) {
 		tfile.open("output/topics_" + to_string(months->at(timeSlice)) + ".txt");
 		for (k = 0; k < K; k++) {
 			for (w = 0; w < 100; w++) {
-				tfile << topwords[timeSlice][k][w];// << ":" << maxval[k][w] << ",";
+				tfile << topwords[timeSlice][k][w] << ":" << maxval[k][w] << ",";
 
 			}
 			tfile << endl;
