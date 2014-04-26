@@ -473,6 +473,17 @@ int main(int argc, char* argv[]) {
 				Beta_t_1[word][topic] = Beta_t[word][topic];
 			}
 		}
+		if (argc == 7) {
+			ofstream pifile;
+			pifile.open("Pi/topics_" + to_string(months->at(timeSlice)) + ".txt");
+			for (k = 0; k < K; k++) {
+				for (w = 0; w < W; w++) {
+					pifile << Pi[w][k] << ",";
+				}
+				pifile << endl;
+			}
+			pifile.close();
+		}
 	}
 	string *dict;
 	dict = new string[W];
@@ -496,18 +507,28 @@ int main(int argc, char* argv[]) {
 		for (k = 0; k < K; k++) {
 			for (w = 0; w < 100; w++) {
 				tfile << topwords[timeSlice][k][w] << ":" << maxval[k][w] << ",";
-
 			}
 			tfile << endl;
 
 			for (w = 0; w < 100; w++) {
 				tfile << dict[topwords[timeSlice][k][w]] << ",";
 			}
-
 			tfile << endl;
 		}
 		tfile.close();
 	}
+
+	ofstream topTenfile;
+	topTenfile.open("TopTen.txt");
+	for (k = 0; k < K; k++) {
+		for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
+			for (w = 0; w < 10; w++) {
+				topTenfile << topwords[timeSlice][k][w] << ",";
+			}
+		}
+		topTenfile << endl;
+	}
+	topTenfile.close();
 
 	return (0);
 
