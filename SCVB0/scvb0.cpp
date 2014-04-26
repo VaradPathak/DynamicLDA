@@ -205,8 +205,8 @@ int main(int argc, char* argv[]) {
 
 	perplexities = new double*[months->size()];
 	for (i = 0; i < months->size(); i++) {
-		perplexities[i] = new double[K];
-		for (int a = 0; a < K; ++a) {
+		perplexities[i] = new double[MAXITER];
+		for (int a = 0; a < MAXITER; ++a) {
 			perplexities[i][a] = 0;
 		}
 	}
