@@ -23,6 +23,9 @@ unsigned int W, D, K;
 
 void Transform(double** beta_t, double** npi) {
 	double* Beta_Total = new double[K];
+	for (int var = 0; var < K; ++var) {
+		Beta_Total[var] = 0;
+	}
 	for (unsigned int q = 0; q < K; ++q) {
 		for (unsigned int p = 0; p < W; ++p) {
 			Beta_Total[q] += exp(beta_t[p][q]);
@@ -36,10 +39,14 @@ void Transform(double** beta_t, double** npi) {
 //				cout << "nPi is "<< npi[p][q]<< " and Beta_t: " << beta_t[p][q] << endl;
 		}
 	}
+	delete [] Beta_Total;
 }
 
 void InverseTransform(double** pi, double** beta_t) {
 	double* Pi_Total = new double[K];
+	for (int var = 0; var < K; ++var) {
+		Pi_Total[var] = 0;
+	}
 	for (unsigned int q = 0; q < K; ++q) {
 		for (unsigned int p = 0; p < W; ++p) {
 			Pi_Total[q] += pi[p][q];
@@ -50,6 +57,7 @@ void InverseTransform(double** pi, double** beta_t) {
 			beta_t[p][q] = log(pi[p][q] / Pi_Total[q]);
 		}
 	}
+	delete [] Pi_Total;
 }
 
 int main(int argc, char* argv[]) {
@@ -243,10 +251,12 @@ int main(int argc, char* argv[]) {
 
 		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
+			N_z[k] = 0;
 			for (w = 0; w < W; w++) {
 				N_z[k] += nPi[w][k];
 			}
 		}
+
 
 		// Find the total number of word in the document
 		int monthFirstDoc = monthFirstIdx->at(timeSlice);
@@ -297,7 +307,7 @@ int main(int argc, char* argv[]) {
 					if (batch_idx == DM) {
 						lastdoc = monthLastDoc;
 					}
-					cout<<"lastdoc: "<<lastdoc<<endl;
+//					cout<<"lastdoc: "<<lastdoc<<endl;
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
 						// First perform the burn-in passes
@@ -484,7 +494,7 @@ int main(int argc, char* argv[]) {
 			}
 			pifile.close();
 		}
-	}
+	} // End of TimeSlice Loop
 	string *dict;
 	dict = new string[W];
 //	char word;
