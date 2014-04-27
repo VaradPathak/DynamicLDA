@@ -29,63 +29,8 @@ using namespace boost;
 
 typedef adjacency_list <vecS, vecS, undirectedS> Graph;
 
-
 // Initialize number of documents, topics and words in vocabulary
 unsigned int W, D, K;
-
-double diffclock(clock_t clock1, clock_t clock2) {
-    double diffticks = clock1 - clock2;
-    double diffms = (diffticks * 1000) / CLOCKS_PER_SEC;
-    return diffms;
-}
-
-double KLDivergence(double*** Pi, int t, int k, double* M) {
-    double result = 0.0;
-    for (unsigned int w = 0; w < W; ++w) {
-        result += log(Pi[t][w][k] / M[w]) * Pi[t][w][k];
-    }
-    return result;
-}
-
-double JSsimilarity(double*** Pi, int t1, int k1, int t2, int k2) {
-    double result = 0.0;
-    double* M = new double[W];
-    for (unsigned int w = 0; w < W; ++w) {
-        M[w] = (Pi[t1][w][k1] + Pi[t2][w][k2]) / 2;
-    }
-    result = KLDivergence(Pi, t1, k1, M) + KLDivergence(Pi, t2, k2, M);
-    result = result / 2;
-    return result;
-}
-
-void generateTopicLinks(Graph &G, double*** Pi, int timeSlice, int topic, int numTopics, int windowSize, double threshold) {
-	for (int w = 0; w < windowSize; w++) {
-		int numLinks = 0;
-		for (int k = 0; k < numTopics; k++) {
-			if ((timeSlice - 1 - w >= 0)
-					&& JSsimilarity(Pi, timeSlice, topic, timeSlice - 1 - w, k) > threshold) {
-				//add edge to graph structure here
-				int e1 = (timeSlice * numTopics) + topic;
-				int e2 = ((timeSlice - 1 - w) * numTopics) + k;
-
-				cout<<"Adding edge "<<e1<<", "<<e2<<endl;
-				add_edge(e1, e2, G);
-				numLinks++;
-			}
-		}
-		if (numLinks > 0) {
-			break;
-		}
-	}
-}
-
-void generateAllLinks(Graph &G, double*** Pi, int numTimeSlices, int numTopics, int windowSize, double threshold) {
-    for (int t = 0; t < numTimeSlices; t++) {
-        for (int k = 0; k < numTopics; k++) {
-            generateTopicLinks(G, Pi, t, k, numTopics, windowSize, threshold);
-        }
-    }
-}
 
 int main(int argc, char* argv[]) {
     if (argc < 4) {
@@ -114,12 +59,9 @@ int main(int argc, char* argv[]) {
     int C = 0;
     int iter = 0;
     int NNZ;
-
-    int windowSize = 0;
-    double similarityThreshold = 0;
-
-    ofstream pfile;
-    pfile.open("perplexity.txt");
+	double perplexityval, innerval;
+	ofstream pfile;
+	pfile.open("perplexity.txt");
 
     M = 100; //343 works for KOS and only for KOS
     eta = 0.01; // was 0.01
@@ -150,8 +92,6 @@ int main(int argc, char* argv[]) {
     //if user also specified a minibatch size
     if (argc > 4) {
         M = atof(argv[4]);
-        windowSize = atoi(argv[6]);
-        similarityThreshold = atof(argv[7]);
     }
 
     MAXITER = atoi(argv[2]);
@@ -259,11 +199,12 @@ int main(int argc, char* argv[]) {
 
     //Generate Numbers according to Gaussian Distribution
 
-    for (int timeSlice = 0; timeSlice < 10; timeSlice++) {
+    for (int timeSlice = 0; timeSlice < months->size(); timeSlice++) {
         cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
         //if parallelizing this, make sure to avoid race condition (most likely use reduction)
         for (k = 0; k < K; k++) {
+        	N_z[k] = 0;
             for (w = 0; w < W; w++) {
                 N_z[k] += nPi[w][k];
             }
@@ -277,8 +218,8 @@ int main(int argc, char* argv[]) {
 
         C = 0;
 
-        for (j = monthFirstDoc; j < monthLastDoc; j++) {
-            C += corpus_size[j];
+        for (int var = monthFirstDoc; var < monthLastDoc; var++) {
+            C += corpus_size[var];
         }
 
         printf("Number of words in corpus: %d\n", C);
@@ -407,11 +348,11 @@ int main(int argc, char* argv[]) {
 
                 // Compute theta
 #pragma omp for
-                for (i = monthFirstDoc; i < monthLastDoc; i++) {
+                for (int var = monthFirstDoc; var < monthLastDoc; var++) {
                     double normSum = 0;
                     for (k = 0; k < K; k++) {
-                        nTheta[i][k] += alpha;
-                        normSum += nTheta[i][k];
+                        nTheta[var][k] += alpha;
+                        normSum += nTheta[var][k];
                     }
                     for (k = 0; k < K; k++) {
                         theta[i][k] = (double) nTheta[i][k] / normSum;
@@ -429,95 +370,98 @@ int main(int argc, char* argv[]) {
 
             }
 
-        } // End of iter
+            // Calculate the perplexity here
+			perplexityval = 0;
+#pragma omp parallel for private(j,i,k) reduction(+:innerval) reduction(+:perplexityval)
+			for (j = monthFirstDoc; j < monthLastDoc; j++) {
+				for (i = 0; i < corpus_expanded[j].size(); i++) {
+					innerval = 0;
+					for (k = 0; k < K; k++) {
+						innerval += (theta[j][k] * Pi[timeSlice][corpus_expanded[j][i]][k]);
+					}
+					perplexityval += (log(innerval) / log(2));
+				}
+			}
+			printf("%d,%f\n", iter, pow(2, -perplexityval / C));
+			perplexities[timeSlice][iter] = pow(2, -perplexityval / C);
 
-        //write doctopics file
-        /*ofstream dtfile;
-        dtfile.open("output/doctopic_" + to_string(months->at(timeSlice)) + ".txt");
-        for (i = monthFirstDoc; i < monthLastDoc; i++) {
-            for (k = 0; k < K; k++) {
-                dtfile << theta[i][k] << ",";
-            }
-            dtfile << endl;
-        }
-        dtfile.close();*/
+			pfile << iter + 1 << "," << perplexities[timeSlice][iter] << endl;
+			pfile.flush();
+
+        } // End of iter
 
         //compute the top 100 words for each topic
 
-//        double** maxval;
-//        topwords[timeSlice] = new int*[K];
-//        maxval = new double*[K];
-//        for (k = 0; k < K; k++) {
-//            topwords[timeSlice][k] = new int[100];
-//            maxval[k] = new double[100];
-//        }
-//        for (k = 0; k < K; k++) {
-//            double oldMax = std::numeric_limits<double>::max();
-//            for (i = 0; i < 100; i++) {
-//                double max = -1;
-//                int max_idx = -1;
-//                for (w = 0; w < W; w++) {
-//                    if (oldMax > Pi[timeSlice][w][k] && Pi[timeSlice][w][k] > max) {
-//                        max = Pi[timeSlice][w][k];
-//                        max_idx = w;
-//                    }
-//                }
-//                oldMax = Pi[timeSlice][max_idx][k];
-//                topwords[timeSlice][k][i] = max_idx;
-//                maxval[k][i] = max;
-//            }
-//        }
+        double** maxval;
+        topwords[timeSlice] = new int*[K];
+        maxval = new double*[K];
+        for (k = 0; k < K; k++) {
+            topwords[timeSlice][k] = new int[100];
+            maxval[k] = new double[100];
+        }
+        for (k = 0; k < K; k++) {
+            double oldMax = std::numeric_limits<double>::max();
+            for (i = 0; i < 100; i++) {
+                double max = -1;
+                int max_idx = -1;
+                for (w = 0; w < W; w++) {
+                    if (oldMax > Pi[timeSlice][w][k] && Pi[timeSlice][w][k] > max) {
+                        max = Pi[timeSlice][w][k];
+                        max_idx = w;
+                    }
+                }
+                oldMax = Pi[timeSlice][max_idx][k];
+                topwords[timeSlice][k][i] = max_idx;
+                maxval[k][i] = max;
+            }
+        }
+
+        ofstream pifile;
+		pifile.open("Pi/topics_" + to_string(months->at(timeSlice)) + ".txt");
+		for (k = 0; k < K; k++) {
+			for (w = 0; w < W-1; w++) {
+				pifile << Pi[timeSlice][w][k] << ",";
+			}
+			pifile << Pi[timeSlice][W-1][k];
+			pifile << endl;
+		}
+		pifile.close();
     }//All timeSlices finished
 
-    // MAKE CHAINS
-    Graph G;
-    //K is unsigned -- is this a problem?
-//    generateAllLinks(G, Pi, months->size(), K, windowSize, similarityThreshold);
-    generateAllLinks(G, Pi, 10, K, windowSize, similarityThreshold);
-
-    vector<int> component(num_vertices(G));
-    int num = connected_components(G, &component[0]);
-
-    vector<int>::size_type p;
-    cout << "Total number of components: " << num << endl;
-    for (p = 0; p != component.size(); ++p)
-   		cout << "Vertex " << p <<" is in component " << component[p] << endl;
-
-//    string *dict;
-//    dict = new string[W];
-////    char word;
-//    //retrieve the words from the file
-//    w = 0;
-//    string line;
-//    ifstream vocabFile(argv[5]);
-//    if (vocabFile.is_open()) {
-//        while (getline(vocabFile, line)) {
-//            dict[w] = line;
-//            w++;
-//        }
-//        vocabFile.close();
-//    }
+    string *dict;
+    dict = new string[W];
+//    char word;
+    //retrieve the words from the file
+    w = 0;
+    string line;
+    ifstream vocabFile(argv[5]);
+    if (vocabFile.is_open()) {
+        while (getline(vocabFile, line)) {
+            dict[w] = line;
+            w++;
+        }
+        vocabFile.close();
+    }
 
 //    write topics file
-//    for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
-//    for (int timeSlice = 0; timeSlice < 10; timeSlice++) {
-//        ofstream tfile;
-//        tfile.open("output/topics_" + to_string(months->at(timeSlice)) + ".txt");
-//        for (k = 0; k < K; k++) {
-//            for (w = 0; w < 100; w++) {
-//                tfile << topwords[timeSlice][k][w];// << ":" << maxval[k][w] << ",";
-//
-//            }
-//            tfile << endl;
-//
-//            for (w = 0; w < 100; w++) {
-//                tfile << dict[topwords[timeSlice][k][w]] << ",";
-//            }
-//
-//            tfile << endl;
-//        }
-//        tfile.close();
-//    }
+    for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
+        ofstream tfile;
+        tfile.open("output/topics_" + to_string(months->at(timeSlice)) + ".txt");
+        for (k = 0; k < K; k++) {
+            for (w = 0; w < 100; w++) {
+                tfile << topwords[timeSlice][k][w];// << ":" << maxval[k][w] << ",";
+
+            }
+            tfile << endl;
+
+            for (w = 0; w < 100; w++) {
+                tfile << dict[topwords[timeSlice][k][w]] << ",";
+            }
+
+            tfile << endl;
+        }
+        tfile.close();
+    }
 
     return (0);
 
