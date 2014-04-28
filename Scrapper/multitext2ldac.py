@@ -129,6 +129,7 @@ def generate_dat_lines_and_word_ids(fnames, config):
     used_docs = [] #needed to generate .dmap file
 
     for dayname in fnames:
+        print dayname
         try:
             with codecs.open(dayname, 'r', 'utf-8') as day:
                 for line in day:
