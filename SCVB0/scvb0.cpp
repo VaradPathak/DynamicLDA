@@ -12,12 +12,6 @@
 #include <map>
 using namespace std;
 
-double diffclock(clock_t clock1, clock_t clock2) {
-	double diffticks = clock1 - clock2;
-	double diffms = (diffticks * 1000) / CLOCKS_PER_SEC;
-	return diffms;
-}
-
 // Initialize number of documents, topics and words in vocabulary
 unsigned int W, D, K;
 
@@ -35,8 +29,6 @@ void Transform(double** beta_t, double** npi) {
 	for (unsigned int p = 0; p < W; ++p) {
 		for (unsigned int q = 0; q < K; ++q) {
 			npi[p][q] = exp(beta_t[p][q]) / Beta_Total[q];
-//			if(npi[p][q] <= 0)
-//				cout << "nPi is "<< npi[p][q]<< " and Beta_t: " << beta_t[p][q] << endl;
 		}
 	}
 	delete [] Beta_Total;
@@ -101,9 +93,9 @@ int main(int argc, char* argv[]) {
 	string newline = "";
 	vector<int>* months = new vector<int>();
 	vector<int>* numOfDocs = new vector<int>();
-        vector<int>* monthFirstIdx = new vector<int>();
-        vector<int>* monthLastIdx = new vector<int>();
-        int curIdx = 0;
+	vector<int>* monthFirstIdx = new vector<int>();
+	vector<int>* monthLastIdx = new vector<int>();
+	int curIdx = 0;
 
 	while (seqfile >> newline) {
 		const char * ptr = strchr(newline.c_str(), ':');
@@ -112,9 +104,9 @@ int main(int argc, char* argv[]) {
 		int yearMonth = atoi(newline.c_str());
 		months->push_back(yearMonth);
 		numOfDocs->push_back(count);
-                monthFirstIdx->push_back(curIdx);
-                monthLastIdx->push_back(curIdx+count);
-                curIdx += count;
+		monthFirstIdx->push_back(curIdx);
+		monthLastIdx->push_back(curIdx + count);
+		curIdx += count;
 	}
 	seqfile.close();
 
@@ -243,7 +235,6 @@ int main(int argc, char* argv[]) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
 				normal_distribution<double> distribution(Beta_t_1[word][topic],	4.0);
 				Beta_t[word][topic] = distribution(generator);
-//				cout<<Beta_t[word][topic]<<endl;
 			}
 		}
 
@@ -307,7 +298,6 @@ int main(int argc, char* argv[]) {
 					if (batch_idx == DM) {
 						lastdoc = monthLastDoc;
 					}
-//					cout<<"lastdoc: "<<lastdoc<<endl;
 					for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
 						// First perform the burn-in passes
@@ -389,7 +379,6 @@ int main(int argc, char* argv[]) {
 						nPi[w][k] += eta;
 						normSum += nPi[w][k];
 					}
-//					cout << normSum << endl;
 					for (w = 0; w < W; w++) {
 						Pi[w][k] = (double) nPi[w][k] / normSum;
 					}
