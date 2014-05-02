@@ -180,16 +180,10 @@ int main(int argc, char* argv[]) {
         nTheta[i] = new double[K];
     }
 
-    for (i = 0; i < D; i++) {
-        for (k = 0; k < K; k++) {
-            nTheta[i][k] = rand() % 10;
-        }
-    }
-
     perplexities = new double*[months->size()];
     for (i = 0; i < months->size(); i++) {
-        perplexities[i] = new double[K];
-        for (unsigned int a = 0; a < K; ++a) {
+        perplexities[i] = new double[MAXITER];
+        for (unsigned int a = 0; a < MAXITER; ++a) {
             perplexities[i][a] = 0;
         }
     }
@@ -201,6 +195,19 @@ int main(int argc, char* argv[]) {
 
     for (int timeSlice = 0; timeSlice < months->size(); timeSlice++) {
         cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
+
+
+        for (int doc = 0; doc < D; doc++) {
+			for (int top = 0; top < K; top++) {
+				nTheta[doc][top] = rand() % 10;
+			}
+		}
+
+		for (int word = 0; word < W; word++) {
+			for (int top = 0; top < K; top++) {
+				nPi[word][top] = rand() % 10;
+			}
+		}
 
         //if parallelizing this, make sure to avoid race condition (most likely use reduction)
         for (k = 0; k < K; k++) {
@@ -340,7 +347,7 @@ int main(int argc, char* argv[]) {
                         nPi[w][k] += eta;
                         normSum += nPi[w][k];
                     }
-//                    cout << normSum << endl;
+
                     for (w = 0; w < W; w++) {
                         Pi[timeSlice][w][k] = (double) nPi[w][k] / normSum;
                     }
@@ -354,8 +361,9 @@ int main(int argc, char* argv[]) {
                         nTheta[var][k] += alpha;
                         normSum += nTheta[var][k];
                     }
+
                     for (k = 0; k < K; k++) {
-                        theta[i][k] = (double) nTheta[i][k] / normSum;
+                        theta[var][k] = (double) nTheta[var][k] / normSum;
                     }
                 }
 
