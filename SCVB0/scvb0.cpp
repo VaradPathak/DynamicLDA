@@ -52,10 +52,9 @@ void InverseTransform(double** pi, double** beta_t) {
 	delete [] Pi_Total;
 }
 
-void runRegularSCVB(double** Beta_t_1,vector<vector<int> > &corpus, vector<int> &corpus_size, int MAXITER){
+void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corpus_size, int MAXITER){
 
 	double **nTheta;
-	double **nPi;
 	double *N_z;
 
 	double rhoTheta = 0;
@@ -85,11 +84,6 @@ void runRegularSCVB(double** Beta_t_1,vector<vector<int> > &corpus, vector<int> 
 
 	// Initialize phi_est and all other arrays
 	N_z = new double[K];
-
-	nPi = new double*[W];
-	for (i = 0; i < W; i++) {
-		nPi[i] = new double[K];
-	}
 
 	for (unsigned int var = 0; var < W; ++var) {
 		for (unsigned int var2 = 0; var2 < K; ++var2) {
@@ -256,7 +250,7 @@ void runRegularSCVB(double** Beta_t_1,vector<vector<int> > &corpus, vector<int> 
 
 	} // End of iter
 
-	InverseTransform(Pi, Beta_t_1);
+//	InverseTransform(Pi, Beta_t_1);
 }
 
 int main(int argc, char* argv[]) {
@@ -430,20 +424,22 @@ int main(int argc, char* argv[]) {
 		Beta_t[i] = new double[K];
 	}
 
-	//Run SCVB to initialize betas and thus reduce initial bias
-	runRegularSCVB(Beta_t_1, corpus, corpus_size, 5);
-
 	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
 		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
-		for (unsigned int word = 0; word < W; ++word) {
-			for (unsigned int topic = 0; topic < K; ++topic) {
-				normal_distribution<double> distribution(Beta_t_1[word][topic],	0.005);
-				Beta_t[word][topic] = distribution(generator);
+		//We are initializing nPi from 5 runs of regular SCVB
+		if (timeSlice == 0) {
+			//Run SCVB to initialize betas and thus reduce initial bias
+			runRegularSCVB(nPi, corpus, corpus_size, 5);
+		} else {
+			for (unsigned int word = 0; word < W; ++word) {
+				for (unsigned int topic = 0; topic < K; ++topic) {
+					normal_distribution<double> distribution(Beta_t_1[word][topic], 0.005);
+					Beta_t[word][topic] = distribution(generator);
+				}
 			}
+			Transform(Beta_t, nPi);
 		}
-
-		Transform(Beta_t, nPi);
 
 		//if parallelizing this, make sure to avoid race condition (most likely use reduction)
 		for (k = 0; k < K; k++) {
@@ -640,6 +636,9 @@ int main(int argc, char* argv[]) {
 			pifile.open("Pi/topics_" + to_string(months->at(timeSlice)) + ".txt");
 			for (k = 0; k < K; k++) {
 				for (w = 0; w < W; w++) {
+					if(w == 23701){
+						cout<<Pi[w][k]<<" at :"<<timeSlice<<", "<<k<<endl;
+					}
 					pifile << Pi[w][k] << ",";
 				}
 				pifile << endl;
