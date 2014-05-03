@@ -24,9 +24,9 @@ if len(sys.argv) >= 3:
         infile = open(infolder + '/' + filename)
         outfile = open(outfolder + '/' + filename, 'w')
         for topic in infile.readlines():
-#             print topic
-            if(topic == ',,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n'):
-                print 'working'
+            temp = topic[:-2].split(',')
+            word_Prob = temp[0].split(':')
+            if not (word_Prob[0].isdigit()):
                 continue
             outline = [buildtriple(idprob,vocab) for idprob in topic[:-2].split(',')]
             map(lambda x: outfile.write(str(x)), outline)

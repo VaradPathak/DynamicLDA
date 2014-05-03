@@ -17,7 +17,7 @@ unsigned int W, D, K;
 
 void Transform(double** beta_t, double** npi) {
 	double* Beta_Total = new double[K];
-	for (int var = 0; var < K; ++var) {
+	for (unsigned int var = 0; var < K; ++var) {
 		Beta_Total[var] = 0;
 	}
 	for (unsigned int q = 0; q < K; ++q) {
@@ -36,7 +36,7 @@ void Transform(double** beta_t, double** npi) {
 
 void InverseTransform(double** pi, double** beta_t) {
 	double* Pi_Total = new double[K];
-	for (int var = 0; var < K; ++var) {
+	for (unsigned int var = 0; var < K; ++var) {
 		Pi_Total[var] = 0;
 	}
 	for (unsigned int q = 0; q < K; ++q) {
@@ -50,6 +50,213 @@ void InverseTransform(double** pi, double** beta_t) {
 		}
 	}
 	delete [] Pi_Total;
+}
+
+void runRegularSCVB(double** Beta_t_1,vector<vector<int> > &corpus, vector<int> &corpus_size, int MAXITER){
+
+	double **nTheta;
+	double **nPi;
+	double *N_z;
+
+	double rhoTheta = 0;
+	double rhoPhi = 0;
+	double **Pi;
+	// Initlalize dirichlet prior parameters
+	double alpha, eta;
+	double M; // Number of documents in each minibatch
+	int Cj = 0;
+	unsigned int i, j, k, w;
+	int batch_idx = 0;
+	int C = 0;
+	int iter = 0;
+	ofstream pfile;
+	pfile.open("perplexity.txt");
+
+	M = 100; //343 works for KOS and only for KOS
+	eta = 0.01; // was 0.01
+	alpha = 0.1;
+
+	// Dynamically allocate phi
+	Pi = new double*[W];
+	//#pragma omp parallel for
+	for (w = 0; w < W; w++) {
+		Pi[w] = new double[K];
+	}
+
+	// Initialize phi_est and all other arrays
+	N_z = new double[K];
+
+	nPi = new double*[W];
+	for (i = 0; i < W; i++) {
+		nPi[i] = new double[K];
+	}
+
+	for (unsigned int var = 0; var < W; ++var) {
+		for (unsigned int var2 = 0; var2 < K; ++var2) {
+			nPi[var][var2] = rand() % 10;
+		}
+	}
+	nTheta = new double*[D];
+	for (i = 0; i < D; i++) {
+		nTheta[i] = new double[K];
+	}
+
+	for (i = 0; i < D; i++) {
+		for (k = 0; k < K; k++) {
+			nTheta[i][k] = rand() % 10;
+		}
+	}
+
+	for (k = 0; k < K; k++) {
+		N_z[k] = 0;
+		for (w = 0; w < W; w++) {
+			N_z[k] += nPi[w][k];
+		}
+	}
+
+
+	// Find the total number of word in the document
+	C = 0;
+	 for(j=0;j<D;j++)
+	    {
+	        C += corpus_size[j];
+	    }
+
+	printf("Number of words in corpus: %d\n", C);
+
+	int firstdoc = 0;
+	int lastdoc = 0;
+	int DM = D / M;
+
+	for (iter = 0; iter < (int)MAXITER; iter++) {
+		cout<<"Executing init SCVB0 iteration no: "<<iter+1<<endl;
+		// Decide rho_phi and rho_theta
+		rhoPhi = 10 / pow((1000 + iter), 0.9);
+		rhoTheta = 1 / pow((10 + iter), 0.9);
+
+#pragma omp parallel private(batch_idx,j,k,i,w,firstdoc,lastdoc)
+		{
+			double *gamma = new double[K];
+			double *nzHat = new double[K];
+			double **nPhiHat = new double *[W];
+			for (k = 0; k < K; k++) {
+				gamma[k] = 0;
+				nzHat[k] = 0;
+			}
+			for (i = 0; i < W; i++) {
+				nPhiHat[i] = new double[K];
+				for (k = 0; k < K; k++) {
+					nPhiHat[i][k] = 0;
+				}
+			}
+
+#pragma omp for
+			for (batch_idx = 0; batch_idx < DM+1; batch_idx++) {
+
+				// Decide the document indices which go in each minibatch
+				firstdoc = batch_idx*M;
+				lastdoc = (batch_idx+1)*M;
+
+				for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
+
+					// First perform the burn-in passes
+					// Iteration of burn in passes
+
+					// Store size of corpus in Cj
+					Cj = corpus_size[j];
+
+					for (i = 0; i < (corpus[j].size() / 2); i++) {// indexing is very different here!
+
+						int w_aj = corpus[j][2 * i];
+						int m_aj = corpus[j][(2 * i) + 1];
+						// Update gamma_ij and N_theta
+						double normSum = 0;
+
+						for (k = 0; k < K; k++) {
+							gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+							normSum += gamma[k];
+						}
+
+						for (k = 0; k < K; k++) {
+							gamma[k] = gamma[k] / normSum;
+						}
+
+						for (k = 0; k < K; k++) {
+
+							nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
+									+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
+						}
+
+					}
+
+					// Iteration of the main loop
+					for (i = 0; i < (corpus[j].size() / 2); i++) { // indexing is very different here!
+
+						int w_aj = corpus[j][2 * i];
+						int m_aj = corpus[j][(2 * i) + 1];
+						double normSum = 0;
+						for (k = 0; k < K; k++) {
+							gamma[k] = (nPi[w_aj][k] + eta) * (nTheta[j][k] + alpha) / (N_z[k] + (eta * W));
+							normSum += gamma[k];
+						}
+
+						for (k = 0; k < K; k++) {
+							gamma[k] = gamma[k] / normSum;
+						}
+
+						// Update N_theta estimates
+						for (k = 0; k < K; k++) {
+							nTheta[j][k] = (pow((1 - rhoTheta), m_aj) * nTheta[j][k])
+									+ ((1 - pow((1 - rhoTheta), m_aj)) * Cj * gamma[k]);
+
+							nPhiHat[w_aj][k] = nPhiHat[w_aj][k] + (C * gamma[k] / M);
+
+							nzHat[k] = nzHat[k] + (C * gamma[k] / M);
+						}
+					}
+
+				} // End of j
+
+				// Update the estimates matrix
+				for (k = 0; k < K; k++) {
+					for (w = 0; w < W; w++) {
+						nPi[w][k] = (1 - rhoPhi) * nPi[w][k] + rhoPhi * nPhiHat[w][k];
+					}
+#pragma omp atomic
+					N_z[k] *= (1 - rhoPhi);
+#pragma omp atomic
+					N_z[k] += rhoPhi * nzHat[k];
+				}
+
+			} // End of batch_idx
+
+			// Compute phi
+#pragma omp for
+			for (k = 0; k < K; k++) {
+				double normSum = 0;
+				for (w = 0; w < W; w++) {
+					nPi[w][k] += eta;
+					normSum += nPi[w][k];
+				}
+				for (w = 0; w < W; w++) {
+					Pi[w][k] = (double) nPi[w][k] / normSum;
+				}
+			}
+
+			delete[] gamma;
+			delete[] nzHat;
+
+			for (i = 0; i < W; i++) {
+				delete[] nPhiHat[i];
+			}
+
+			delete[] nPhiHat;
+
+		}
+
+	} // End of iter
+
+	InverseTransform(Pi, Beta_t_1);
 }
 
 int main(int argc, char* argv[]) {
@@ -75,7 +282,6 @@ int main(int argc, char* argv[]) {
 	double M; // Number of documents in each minibatch
 	int Cj = 0;
 	unsigned int i, j, k, w, MAXITER;
-	double norm_sum = 0;
 	int batch_idx = 0;
 	int C = 0;
 	int iter = 0;
@@ -206,7 +412,7 @@ int main(int argc, char* argv[]) {
 	perplexities = new double*[months->size()];
 	for (i = 0; i < months->size(); i++) {
 		perplexities[i] = new double[MAXITER];
-		for (int a = 0; a < MAXITER; ++a) {
+		for (unsigned int a = 0; a < MAXITER; ++a) {
 			perplexities[i][a] = 0;
 		}
 	}
@@ -223,17 +429,16 @@ int main(int argc, char* argv[]) {
 		Beta_t_1[i] = new double[K];
 		Beta_t[i] = new double[K];
 	}
-	for (unsigned int p = 0; p < W; ++p) {
-		for (unsigned int q = 0; q < K; ++q) {
-			Beta_t_1[p][q] = rand() % 10;
-		}
-	}
+
+	//Run SCVB to initialize betas and thus reduce initial bias
+	runRegularSCVB(Beta_t_1, corpus, corpus_size, 5);
+
 	for (int timeSlice = 0; timeSlice < (int) months->size(); timeSlice++) {
 		cout << (*months)[timeSlice] << " " << (*numOfDocs)[timeSlice] << endl;
 
 		for (unsigned int word = 0; word < W; ++word) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
-				normal_distribution<double> distribution(Beta_t_1[word][topic],	4.0);
+				normal_distribution<double> distribution(Beta_t_1[word][topic],	0.005);
 				Beta_t[word][topic] = distribution(generator);
 			}
 		}
@@ -257,7 +462,7 @@ int main(int argc, char* argv[]) {
 
 		C = 0;
 
-		for (j = monthFirstDoc; j < monthLastDoc; j++) {
+		for (j = monthFirstDoc; j < (unsigned)monthLastDoc; j++) {
 			C += corpus_size[j];
 		}
 
@@ -272,7 +477,7 @@ int main(int argc, char* argv[]) {
 			rhoPhi = 10 / pow((1000 + iter), 0.9);
 			rhoTheta = 1 / pow((10 + iter), 0.9);
 
-#pragma omp parallel private(batch_idx,j,k,norm_sum,i,w,firstdoc,lastdoc)
+#pragma omp parallel private(batch_idx,j,k,i,w,firstdoc,lastdoc)
 			{
 				double *gamma = new double[K];
 				double *nzHat = new double[K];
@@ -386,7 +591,7 @@ int main(int argc, char* argv[]) {
 
 				// Compute theta
 #pragma omp for
-				for (i = monthFirstDoc; i < monthLastDoc; i++) {
+				for (i = monthFirstDoc; i < (unsigned)monthLastDoc; i++) {
 					double normSum = 0;
 					for (k = 0; k < K; k++) {
 						nTheta[i][k] += alpha;
@@ -413,7 +618,7 @@ int main(int argc, char* argv[]) {
 			// Iterate over the corpus here
 			perplexityval = 0;
 #pragma omp parallel for private(j,i,k) reduction(+:innerval) reduction(+:perplexityval)
-			for (j = monthFirstDoc; j < monthLastDoc; j++) {
+			for (j = monthFirstDoc; j < (unsigned)monthLastDoc; j++) {
 				for (i = 0; i < corpus_expanded[j].size(); i++) {
 					innerval = 0;
 					for (k = 0; k < K; k++) {
@@ -430,16 +635,17 @@ int main(int argc, char* argv[]) {
 
 		} // End of iter
 
-		//write doctopics file
-		/*ofstream dtfile;
-		dtfile.open("output/doctopic_" + to_string(months->at(timeSlice)) + ".txt");
-		for (i = monthFirstDoc; i < monthLastDoc; i++) {
+		if (argc == 7) {
+			ofstream pifile;
+			pifile.open("Pi/topics_" + to_string(months->at(timeSlice)) + ".txt");
 			for (k = 0; k < K; k++) {
-				dtfile << theta[i][k] << ",";
+				for (w = 0; w < W; w++) {
+					pifile << Pi[w][k] << ",";
+				}
+				pifile << endl;
 			}
-			dtfile << endl;
+			pifile.close();
 		}
-		dtfile.close();*/
 
 		//compute the top 100 words for each topic
 
@@ -471,17 +677,6 @@ int main(int argc, char* argv[]) {
 			for (unsigned int topic = 0; topic < K; ++topic) {
 				Beta_t_1[word][topic] = Beta_t[word][topic];
 			}
-		}
-		if (argc == 7) {
-			ofstream pifile;
-			pifile.open("Pi/topics_" + to_string(months->at(timeSlice)) + ".txt");
-			for (k = 0; k < K; k++) {
-				for (w = 0; w < W; w++) {
-					pifile << Pi[w][k] << ",";
-				}
-				pifile << endl;
-			}
-			pifile.close();
 		}
 	} // End of TimeSlice Loop
 	string *dict;
