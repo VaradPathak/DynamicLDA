@@ -10,5 +10,8 @@ GetData: TopicChains/GetData.cpp
 serial: SCVB0/scvb0.cpp
 	g++ -g -std=c++0x SCVB0/scvb0.cpp -o fastLDA
 
+scvb: SCVB0_Evaluation/scvb.cpp
+	g++ -g -std=c++0x -fopenmp SCVB0_Evaluation/scvb.cpp -o scvb
+	
 clean:
 	rm -f *.o fastLDA GetData GenerateChains
