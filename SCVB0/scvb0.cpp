@@ -52,7 +52,7 @@ void InverseTransform(double** pi, double** beta_t) {
 	delete [] Pi_Total;
 }
 
-void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corpus_size, int MAXITER){
+void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corpus_size, int MAXITER, double M){
 
 	double **nTheta;
 	double *N_z;
@@ -62,7 +62,7 @@ void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corp
 	double **Pi;
 	// Initlalize dirichlet prior parameters
 	double alpha, eta;
-	double M; // Number of documents in each minibatch
+	//double M; // Number of documents in each minibatch
 	int Cj = 0;
 	unsigned int i, j, k, w;
 	int batch_idx = 0;
@@ -71,7 +71,7 @@ void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corp
 	ofstream pfile;
 	pfile.open("perplexity.txt");
 
-	M = 100; //343 works for KOS and only for KOS
+	//M = 100; //343 works for KOS and only for KOS
 	eta = 0.01; // was 0.01
 	alpha = 0.1;
 
@@ -145,11 +145,11 @@ void runRegularSCVB(double** nPi,vector<vector<int> > &corpus, vector<int> &corp
 			}
 
 #pragma omp for
-			for (batch_idx = 0; batch_idx < DM+1; batch_idx++) {
+			for (batch_idx = 0; batch_idx < DM; batch_idx++) {
 
 				// Decide the document indices which go in each minibatch
-				firstdoc = batch_idx*M;
-				lastdoc = (batch_idx+1)*M;
+				firstdoc = batch_idx * M;
+				lastdoc = (batch_idx+1) * M;
 
 				for (j = (unsigned)firstdoc; j < (unsigned)lastdoc; j++) {
 
@@ -289,7 +289,7 @@ int main(int argc, char* argv[]) {
 	alpha = 0.1;
 
 	ifstream seqfile;
-	seqfile.open("Data/seqfile.txt");
+	seqfile.open("Data/test-seq.dat");
 	string newline = "";
 	vector<int>* months = new vector<int>();
 	vector<int>* numOfDocs = new vector<int>();
@@ -311,9 +311,9 @@ int main(int argc, char* argv[]) {
 	seqfile.close();
 
 	//if user also specified a minibatch size
-	if (argc == 5 || argc == 6) {
+	//if (argc == 5 || argc == 6) {
 		M = atof(argv[4]);
-	}
+	//}
 
 	MAXITER = atoi(argv[2]);
 	K = atoi(argv[3]);
@@ -430,7 +430,7 @@ int main(int argc, char* argv[]) {
 		//We are initializing nPi from 5 runs of regular SCVB
 		if (timeSlice == 0) {
 			//Run SCVB to initialize betas and thus reduce initial bias
-			runRegularSCVB(nPi, corpus, corpus_size, 5);
+			runRegularSCVB(nPi, corpus, corpus_size, 5, M);
 		} else {
 			for (unsigned int word = 0; word < W; ++word) {
 				for (unsigned int topic = 0; topic < K; ++topic) {
