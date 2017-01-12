@@ -6,7 +6,7 @@ Dynamic Topic Model of Reuters News Articles between 2007-2013
 <p>We have implemented fast version of <a href="https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&ved=0CDAQFjAA&url=http%3A%2F%2Fwww.cs.cmu.edu%2F~lafferty%2Fpub%2Fdtm.pdf&ei=YZJqU_-ABIL_oQTVroCQDg&usg=AFQjCNGicS7Nr_Q76R5uSUczaUP2DaAd1A&sig2=xOoJWejgXXVBTu9wf4vAVw&bvm=bv.66111022,d.cGU&cad=rja">Dynamic Topic Model</a> proposed by David Blei and John Lafferty in 2006.</p>
 <p>This version takes advantage of new advancements in LDA model. We have implemented the LDA part of DTM using <a href="http://arxiv.org/abs/1305.2452">SCVB0</a> which is proposed by Foulds, et al 2013. This is parallelized implementation of SCVB0 using OpenMP.</p>
 <p>As per our evaluation, even our Serial version gives 36X speedup and the Parallel version when run on core 2 duo 2GHz 2Gb machine gives 53X speedup.</p>
-<p> (<a href="https://www.dropbox.com/s/8hudevuubex7egq/DTM%20Final%20Report.pdf">Report with detail evaluation</a>)</p>
+<p> (<a href="https://drive.google.com/file/d/0B_VfeWUws5WUdGxZRzFHd25kcU0/view?usp=sharing">Report with detail evaluation</a>)</p>
 
 Reuters News Dataset Details
 ----------------------------
